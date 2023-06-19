@@ -20,36 +20,67 @@ const createWindow = () => {
 
       mainWindow.loadFile('src/renderer/mainWindow/index.html')
 }
+
+const createSpotWindow = () => {
+  spotWindow = new BrowserWindow({
+      // width:800,
+      // height:100,
+      width:800,
+      height:500, // testing size to see dev console
+      resizable:false,
+      frame:false,
+      show: false, // do not show the spotWindow immediately
+      closable: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        devTools: true
+      }
+  })
+
+  spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html');
+  spotWindow.webContents.openDevTools();
+  
+
+}
+
 app.whenReady().then(() => {
   
-  spotWindow = new BrowserWindow({
-    width:800,
-    height:100,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      devTools: true
-    }
-  })
+  createWindow();
+
+  createSpotWindow();
 
   
   spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html')
 
   // Register global shortcut
-  const ret = globalShortcut.register('CommandOrControl+X', () => {
-    // Show the spotWindow when the shortcut is pressed
-    spotWindow.show()
-  })
+  const ret = globalShortcut.register('CommandOrControl+Space', () => {
+    if(spotWindow.isVisible()){
+        spotWindow.hide();
+    }else{
+        spotWindow.show();
+    }
+})
 
   if (!ret) console.log('registration failed')
 
-  console.log(globalShortcut.isRegistered('CommandOrControl+X'))
+  console.log(globalShortcut.isRegistered('CommandOrControl+Space'))
 
     // Create windows
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
+
+    spotWindow.on('blur', () => {
+      spotWindow.hide();
+    });
+
+    spotWindow.on('show', () => {
+      spotWindow.webContents.send('window-shown');
+    });
 })
+
+
 
 app.on('window-all-closed', () => {
     shutdown();
@@ -62,7 +93,7 @@ const shutdown = () => {
 
 const unregister = () => {
 
-    globalShortcut.unregister('CommandOrControl+X')
+    globalShortcut.unregister('CommandOrControl+Space')
     globalShortcut.unregisterAll()
 }
 app.on('will-quit', () => {
@@ -71,9 +102,14 @@ app.on('will-quit', () => {
 })
 
 // Listen for 'query' events from the spotWindow
-ipcMain.on('query', (event, query) => {
+ipcMain.on('run-query', (event, query) => {
   // Send the query to the mainWindow
-  mainWindow.webContents.send('query', query)
+  mainWindow.webContents.send('run-query', query)
+  console.log('query:' + query);
 })
 
-
+ipcMain.on('hide-window', () => {
+  if (spotWindow) {
+    spotWindow.hide();
+  }
+})
