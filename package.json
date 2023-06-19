@@ -2,7 +2,7 @@
   "name": "spotgpt",
   "version": "1.0.0",
   "description": "Spotlight-like quick search for fast access to chatGPT API",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
