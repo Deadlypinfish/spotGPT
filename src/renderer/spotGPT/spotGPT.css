@@ -1,0 +1,35 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #26232c;
+    height: 100vh;
+    width: 100vw;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+input:focus {
+    outline: none;
+}
+
+input:invalid {
+    box-shadow: none;
+}
+
+input {
+    width: 100%;
+    height: 100%;
+    font-size: 1.2em;
+    border-radius: 5px;
+    background: #26232c;
+    border:none;
+    outline: none;
+    box-shadow: none;
+    /* border: 1px solid #36323a; */
+    color: white;
+    font-family: arial;
+    /* padding-left: 10px; */
+    padding: 1em;
+}

@@ -23,23 +23,23 @@ const createWindow = () => {
 
 const createSpotWindow = () => {
   spotWindow = new BrowserWindow({
-      // width:800,
-      // height:100,
       width:800,
-      height:500, // testing size to see dev console
+      height:80,
+      // width:800,
+      // height:500, // testing size to see dev console
       resizable:false,
       frame:false,
       show: false, // do not show the spotWindow immediately
       closable: false,
       webPreferences: {
         nodeIntegration: true,
-        contextIsolation: false,
-        devTools: true
+        contextIsolation: false
+        //devTools: true
       }
   })
 
   spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html');
-  spotWindow.webContents.openDevTools();
+  //spotWindow.webContents.openDevTools();
   
 
 }
