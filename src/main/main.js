@@ -9,20 +9,29 @@ const configuration = new Configuration({
 
 let mainWindow, spotWindow;
 
-const createWindow = () => {
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      devTools: true,
-    },
+function createMainWindow() {
+  return new Promise(resolve => {
+    mainWindow = new BrowserWindow({
+      width: 800,
+      height: 600,
+  
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        devTools: true,
+      },
+    });
+  
+    mainWindow.loadFile("src/renderer/mainWindow/index.html");
+  
+    mainWindow.webContents.on('did-finish-load', () => {
+      resolve();
+    });
+    
+    
+    //mainWindow.webContents.openDevTools();
   });
-
-  mainWindow.loadFile("src/renderer/mainWindow/index.html");
-  //mainWindow.webContents.openDevTools();
+  
 };
 
 const createSpotWindow = () => {
@@ -47,7 +56,7 @@ const createSpotWindow = () => {
 };
 
 app.whenReady().then(() => {
-  createWindow();
+  createMainWindow();
 
   createSpotWindow();
 
@@ -116,11 +125,15 @@ ipcMain.on("run-query", async (event, query) => {
 
     console.log(chatCompletion.data.choices[0].message);
 
-    // If you need to send the result to the renderer process, you can do so
-    mainWindow.webContents.send(
-      "api-response",
-      chatCompletion.data.choices[0].message
-    );
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      await createMainWindow();
+    }
+
+    mainWindow.webContents.send('api-response', chatCompletion.data.choices[0].message);
+
+    
+    
   } catch (error) {
     console.error(error);
   }
