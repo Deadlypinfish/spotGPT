@@ -2,6 +2,7 @@ const { app, Tray, Menu, BrowserWindow, globalShortcut, ipcMain } = require("ele
 const { Configuration, OpenAIApi } = require("openai");
 
 require("dotenv").config();
+const path = require('path');
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
@@ -14,7 +15,7 @@ const createMainWindow = () => {
     mainWindow = new BrowserWindow({
       width: 800,
       height: 600,
-  
+      icon: path.join(__dirname, '..', 'assets', 'icon.png'),
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -54,7 +55,7 @@ app.whenReady().then(() => {
 
   createSpotWindow();
 
-  tray = new Tray('src/assets/icon.png');
+  tray = new Tray(path.join(__dirname, '..', 'assets', 'icon.png'));
   
   tray.setToolTip('spotGPT')
 
@@ -69,6 +70,10 @@ app.whenReady().then(() => {
       label: 'Quit',
       click: function() {
         app.isQuiting = true;
+        if (tray) {
+          tray.destroy();
+          tray = null;
+        }
         app.quit();
       }
     }
@@ -108,7 +113,7 @@ app.whenReady().then(() => {
   });
 
   app.on('before-quit', () => {
-    tray.destroy();
+    isQuitting = true;
   });
 
   spotWindow.on("blur", () => {
