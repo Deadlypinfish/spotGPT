@@ -1,0 +1,29 @@
+body {
+    padding: 0;
+    margin: 0;
+    background: #2c2c2c;
+}
+
+.container {
+    display: flex;
+    width: 100%;
+}
+
+.side-menu {
+    background: salmon;
+    width: 260px;
+    min-width: 260px;
+}
+
+.chat {
+    background: blue;
+    width: 100%;
+}
+
+.content {
+    background: lightblue;
+}
+
+.user-input {
+    background: skyblue;
+}
