@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain } = require("electron");
+const { app, Tray, Menu, BrowserWindow, globalShortcut, ipcMain } = require("electron");
 const { Configuration, OpenAIApi } = require("openai");
 
 require("dotenv").config();
@@ -8,9 +8,9 @@ const configuration = new Configuration({
 });
 
 let mainWindow, spotWindow;
+let tray = null;
 
-function createMainWindow() {
-  return new Promise(resolve => {
+const createMainWindow = () => {
     mainWindow = new BrowserWindow({
       width: 800,
       height: 600,
@@ -22,15 +22,9 @@ function createMainWindow() {
       },
     });
   
-    mainWindow.loadFile("src/renderer/mainWindow/index.html");
-  
-    mainWindow.webContents.on('did-finish-load', () => {
-      resolve();
-    });
-    
+    mainWindow.loadFile("src/renderer/mainWindow/index.html");    
     
     //mainWindow.webContents.openDevTools();
-  });
   
 };
 
@@ -60,6 +54,39 @@ app.whenReady().then(() => {
 
   createSpotWindow();
 
+  tray = new Tray('src/assets/icon.png');
+  
+  tray.setToolTip('spotGPT')
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open',
+      click: function() {
+        mainWindow.show();
+      }
+    },
+    {
+      label: 'Quit',
+      click: function() {
+        app.isQuiting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    mainWindow.show();
+  })
+
+  mainWindow.on('close', (event) => {
+    if(!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  })
+
   //spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html')
 
   // Register global shortcut
@@ -78,6 +105,10 @@ app.whenReady().then(() => {
   // Create windows
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  app.on('before-quit', () => {
+    tray.destroy();
   });
 
   spotWindow.on("blur", () => {
@@ -125,11 +156,7 @@ ipcMain.on("run-query", async (event, query) => {
 
     console.log(chatCompletion.data.choices[0].message);
 
-
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      await createMainWindow();
-    }
-
+    mainWindow.show();
     mainWindow.webContents.send('api-response', chatCompletion.data.choices[0].message);
 
     
