@@ -14,6 +14,7 @@ let tray = null;
 const createMainWindow = () => {
     mainWindow = new BrowserWindow({
       width: 800,
+      //width: 1800,
       height: 600,
       icon: path.join(__dirname, '..', 'assets', 'icon.png'),
       webPreferences: {
@@ -164,6 +165,10 @@ ipcMain.on("run-query", async (event, query) => {
     mainWindow.show();
     mainWindow.webContents.send('api-response', chatCompletion.data.choices[0].message);
 
+    //await new Promise(resolve => setTimeout(resolve, 3000));
+
+    //mainWindow.show();
+    //mainWindow.webContents.send('api-response', {content:'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Sed enim ut sem viverra aliquet eget sit amet. Sed sed risus pretium quam vulputate dignissim suspendisse in. Auctor elit sed vulputate mi sit amet mauris commodo. Nisi lacus sed viverra tellus in hac habitasse. Velit dignissim sodales ut eu sem integer vitae justo eget. Scelerisque purus semper eget duis at tellus at urna. At consectetur lorem donec massa sapien. Sed blandit libero volutpat sed cras ornare arcu dui vivamus.'});
     
     
   } catch (error) {
