@@ -1,8 +1,81 @@
 const { app, Tray, Menu, BrowserWindow, globalShortcut, ipcMain } = require("electron");
 const { Configuration, OpenAIApi } = require("openai");
-
 require("dotenv").config();
+
+const fs = require('fs');
 const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
+
+const dbPath = path.join(__dirname, '..', 'database', 'chatDatabase.cb');
+
+const dirPath = path.dirname(dbPath);
+
+if (!fs.existsSync(dirPath)) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+let db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+  if (err && err.code == "SQLITE_CANTOPEN") {
+      createDatabase();
+      return;
+  } else if (err) {
+      console.log("Getting error " + err);
+      return;
+  }
+  runQueries(db);
+});
+
+function createDatabase() {
+  var newdb = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+          console.log("Getting error " + err);
+          return;
+      }
+      createTables(newdb);
+  });
+}
+
+function createTables(newdb) {
+  newdb.exec(`
+    CREATE TABLE chats(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_name TEXT NOT NULL
+    );
+
+    CREATE TABLE messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY(chat_id) REFERENCES chats(id)
+    );
+    `, ()  => {
+        runQueries(newdb);
+    });
+}
+
+function runQueries(db) {
+  // Implement your queries here.
+}
+
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS chats (
+            id INTEGER PRIMARY KEY,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY,
+            chatId INTEGER,
+            role TEXT,
+            content TEXT,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(chatId) REFERENCES chats(id)
+          )`);
+
+  db.run("PRAGMA foreign_keys = ON");
+});
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
@@ -154,13 +227,54 @@ ipcMain.on("run-query", async (event, query) => {
   //   console.log(e);
   // });
 
+  // Get ID of active chat, if any
+  let activeChatId = ''; // Get this from your application state
+
+
   try {
     const chatCompletion = await openai.createChatCompletion({
       model: "gpt-3.5-turbo", // replace with the engine you're using
       messages: [{ role: "user", content: query }],
     });
 
-    console.log(chatCompletion.data.choices[0].message);
+    console.log(chatCompletion.data.choices[0].message.content);
+
+    
+    
+
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+    
+      db.run(`INSERT INTO chats DEFAULT VALUES`, function(err) {
+        if (err) {
+          console.error(err.message);
+          return db.run('ROLLBACK');
+        }
+        // The last inserted row id is here
+        let activeChatId = this.lastID;
+    
+        // insert user query
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'user', query], function(err) {
+          if (err) {
+            console.error(err.message);
+            return db.run('ROLLBACK');
+          }
+    
+          // Now insert the assistant's message, using the activeChatId
+          db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'assistant', chatCompletion.data.choices[0].message.content], function(err) {
+            if (err) {
+              console.error(err.message);
+              return db.run('ROLLBACK');
+            }
+    
+            // If no errors, commit the transaction
+            db.run('COMMIT');
+          });
+        });
+      });
+    });
+
+    
 
     mainWindow.show();
     mainWindow.webContents.send('api-response', chatCompletion.data.choices[0].message);
@@ -174,6 +288,7 @@ ipcMain.on("run-query", async (event, query) => {
   } catch (error) {
     console.error(error);
   }
+
 
   // Send the query to the mainWindow
   //mainWindow.webContents.send('run-query', query)
