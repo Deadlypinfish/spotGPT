@@ -5,77 +5,22 @@ require("dotenv").config();
 const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
+const nlp = require('compromise');
+const { removeStopwords } = require('stopword');
 
-const dbPath = path.join(__dirname, '..', 'database', 'chatDatabase.cb');
+const dbPath = path.join(__dirname, '..', 'database', 'chatDatabase.db');
 
 const dirPath = path.dirname(dbPath);
+
+
 
 if (!fs.existsSync(dirPath)) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-let db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
-  if (err && err.code == "SQLITE_CANTOPEN") {
-      createDatabase();
-      return;
-  } else if (err) {
-      console.log("Getting error " + err);
-      return;
-  }
-  runQueries(db);
-});
 
-function createDatabase() {
-  var newdb = new sqlite3.Database(dbPath, (err) => {
-      if (err) {
-          console.log("Getting error " + err);
-          return;
-      }
-      createTables(newdb);
-  });
-}
 
-function createTables(newdb) {
-  newdb.exec(`
-    CREATE TABLE chats(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chat_name TEXT NOT NULL
-    );
 
-    CREATE TABLE messages(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chat_id INTEGER NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY(chat_id) REFERENCES chats(id)
-    );
-    `, ()  => {
-        runQueries(newdb);
-    });
-}
-
-function runQueries(db) {
-  // Implement your queries here.
-}
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS chats (
-            id INTEGER PRIMARY KEY,
-            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-          )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY,
-            chatId INTEGER,
-            role TEXT,
-            content TEXT,
-            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(chatId) REFERENCES chats(id)
-          )`);
-
-  db.run("PRAGMA foreign_keys = ON");
-});
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
@@ -86,8 +31,8 @@ let tray = null;
 
 const createMainWindow = () => {
     mainWindow = new BrowserWindow({
-      width: 800,
-      //width: 1800,
+      //width: 800,
+      width: 1800,
       height: 600,
       icon: path.join(__dirname, '..', 'assets', 'icon.png'),
       webPreferences: {
@@ -99,7 +44,7 @@ const createMainWindow = () => {
   
     mainWindow.loadFile("src/renderer/mainWindow/index.html");    
     
-    //mainWindow.webContents.openDevTools();
+    mainWindow.webContents.openDevTools();
   
 };
 
@@ -124,10 +69,105 @@ const createSpotWindow = () => {
   //spotWindow.webContents.openDevTools();
 };
 
+function loadAndSendChatList() {
+  db.all(`SELECT * FROM chats`, [], (err, rows) => {
+    if (err) {
+      throw err;
+    }
+
+    mainWindow.webContents.send('chat-list', rows);
+    
+  })
+}
+
+function getChatMessages(chatId) {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT * FROM messages WHERE chatId = ? ORDER BY createdAt, id`, chatId, (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+}
+
+function initDatabase() {
+  let db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+    if (err && err.code == "SQLITE_CANTOPEN") {
+        createDatabase();
+        return;
+    } else if (err) {
+        console.log("Getting error " + err);
+        return;
+    }
+    runQueries(db);
+  });
+  
+  function createDatabase() {
+    // var newdb = new sqlite3.Database(dbPath, (err) => {
+    //     if (err) {
+    //         console.log("Getting error " + err);
+    //         return;
+    //     }
+    //     createTables(newdb);
+    // });
+    db.serialize(() => {
+      db.run(`CREATE TABLE IF NOT EXISTS chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_name TEXT NOT NULL,
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+              )`);
+    
+      db.run(`CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chatId INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(chatId) REFERENCES chats(id)
+              )`);
+    
+      db.run("PRAGMA foreign_keys = ON");
+    });
+  }
+  
+  // function createTables(newdb) {
+  //   newdb.exec(`
+  //     CREATE TABLE IF NOT EXISTS chats (
+  //       id INTEGER PRIMARY KEY AUTOINCREMENT,
+  //       chat_name TEXT NOT NULL,
+  //       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  //     );
+  
+  //     CREATE TABLE IF NOT EXISTS messages (
+  //       id INTEGER PRIMARY KEY AUTOINCREMENT,
+  //       chatId INTEGER NOT NULL,
+  //       role TEXT NOT NULL,
+  //       content TEXT NOT NULL,
+  //       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  //       FOREIGN KEY(chatId) REFERENCES chats(id)
+  //     );
+  
+  //     PRAGMA foreign_keys = ON;
+  //     `, ()  => {
+  //         runQueries(newdb);
+  //     });
+  // }
+  
+  function runQueries(db) {
+    // Implement your queries here.
+    loadAndSendChatList();
+  }
+}
+
 app.whenReady().then(() => {
   createMainWindow();
 
   createSpotWindow();
+
+  initDatabase();
+  //loadAndSendChatList();
 
   tray = new Tray(path.join(__dirname, '..', 'assets', 'icon.png'));
   
@@ -217,81 +257,88 @@ app.on("will-quit", () => {
 });
 
 // Listen for 'query' events from the spotWindow
-ipcMain.on("run-query", async (event, query) => {
-  console.log("query:" + query);
+//let data = { query: userInput, id: activeChatID};
+ipcMain.on("run-query", async (event, data) => {
+  console.log("query:" + data.query);
 
   const openai = new OpenAIApi(configuration);
   console.log("openai:" + openai);
 
-  // openai.listEngines().then((e) => {
-  //   console.log(e);
-  // });
-
-  // Get ID of active chat, if any
-  let activeChatId = ''; // Get this from your application state
-
-
   try {
     const chatCompletion = await openai.createChatCompletion({
       model: "gpt-3.5-turbo", // replace with the engine you're using
-      messages: [{ role: "user", content: query }],
+      messages: [{ role: "user", content: data.query }],
     });
 
     console.log(chatCompletion.data.choices[0].message.content);
 
+    let activeChatId = data.id;
     
-    
-
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
-    
-      db.run(`INSERT INTO chats DEFAULT VALUES`, function(err) {
-        if (err) {
-          console.error(err.message);
-          return db.run('ROLLBACK');
-        }
-        // The last inserted row id is here
-        let activeChatId = this.lastID;
-    
-        // insert user query
-        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'user', query], function(err) {
+
+      if(!activeChatId){
+        let chatName = extractKeywords(data.query);
+
+        db.run(`INSERT INTO chats(chat_name) VALUES(?)`, [chatName], function(err) {
           if (err) {
             console.error(err.message);
             return db.run('ROLLBACK');
           }
-    
-          // Now insert the assistant's message, using the activeChatId
-          db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'assistant', chatCompletion.data.choices[0].message.content], function(err) {
-            if (err) {
+          activeChatId = this.lastID;
+
+          insertUserMessage();
+        });
+      }else{
+        insertUserMessage();
+      }
+
+      function insertUserMessage(){
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'user', data.query], function(err) {
+          if (err) {
+            console.error(err.message);
+            return db.run('ROLLBACK');
+          }
+
+          insertAssistantMessage();
+        });
+      }
+
+      function insertAssistantMessage(){
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'assistant', chatCompletion.data.choices[0].message.content], function(err) {
+          if (err) {
+            console.error(err.message);
+            return db.run('ROLLBACK');
+          }
+
+          db.run('COMMIT', function(err){
+            if(err){
               console.error(err.message);
               return db.run('ROLLBACK');
             }
-    
+
             // If no errors, commit the transaction
-            db.run('COMMIT');
+            loadAndSendChatList();
+            
+            try {
+              const messages = getChatMessages(chatId).then(() =>{
+                mainWindow.webContents.send('chat-messages', messages);
+              });
+            } catch (err) {
+              console.error(err);
+            }
+            
+            
+            mainWindow.show();
+            mainWindow.webContents.send('api-response', { message: chatCompletion.data.choices[0].message, id: activeChatId } );
           });
         });
-      });
+      }
+      
     });
-
-    
-
-    mainWindow.show();
-    mainWindow.webContents.send('api-response', chatCompletion.data.choices[0].message);
-
-    //await new Promise(resolve => setTimeout(resolve, 3000));
-
-    //mainWindow.show();
-    //mainWindow.webContents.send('api-response', {content:'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Sed enim ut sem viverra aliquet eget sit amet. Sed sed risus pretium quam vulputate dignissim suspendisse in. Auctor elit sed vulputate mi sit amet mauris commodo. Nisi lacus sed viverra tellus in hac habitasse. Velit dignissim sodales ut eu sem integer vitae justo eget. Scelerisque purus semper eget duis at tellus at urna. At consectetur lorem donec massa sapien. Sed blandit libero volutpat sed cras ornare arcu dui vivamus.'});
-    
-    
   } catch (error) {
     console.error(error);
   }
-
-
-  // Send the query to the mainWindow
-  //mainWindow.webContents.send('run-query', query)
 });
 
 ipcMain.on("hide-window", () => {
@@ -299,3 +346,79 @@ ipcMain.on("hide-window", () => {
     spotWindow.hide();
   }
 });
+
+ipcMain.on('change-chat', async (event, chatId) => {
+  // Query the messages for the selected chat and send them back to renderer process
+  // You can use the `chatId` to select the right messages from your database.
+  try {
+    const messages = await getChatMessages(chatId);
+    mainWindow.webContents.send('chat-messages', messages);
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+
+// function extractKeywords(text) {
+//   const doc = nlp(text);
+//   const nouns = doc.nouns().out('array');
+//   const adjectives = doc.adjectives().out('array');
+  
+//   // Combine the extracted nouns and adjectives
+//   const keywords = [...nouns, ...adjectives];
+  
+//   // Remove duplicates and join the keywords into a single string
+//   const chatName = Array.from(new Set(keywords)).join(' ');
+
+//   return chatName;
+// }
+
+function extractKeywords(text) {
+  // Convert text to lower case and split it into an array of words
+  let words = text.toLowerCase().split(/\W+/);
+
+  // Remove stop words
+  let keywords = removeStopwords(words);
+  
+  // Count the occurrences of each word
+  let keywordFrequencies = keywords.reduce((counts, word) => {
+    counts[word] = (counts[word] || 0) + 1;
+    return counts;
+  }, {});
+  
+  // Sort the words by frequency
+  let sortedKeywords = Object.keys(keywordFrequencies).sort((a, b) => keywordFrequencies[b] - keywordFrequencies[a]);
+  
+  // Take the top 3 most frequent words
+  let topKeywords = sortedKeywords.slice(0, 5);
+
+  return topKeywords.join(' ');
+}
+
+// function extractKeywords(text) {
+//   let doc = nlp(text);
+//   // Extract keywords as the words that aren't filler (stop) words
+//   let words = doc
+//     .normalize() // Normalize text
+//     .out('array'); // Extract array of words
+  
+//   // Remove stop words
+//   let keywords = removeStopwords(words);
+  
+//   // Return top 3 most frequent non-stopwords, if available
+//   let keywordFrequencies = keywords.reduce((counts, word) => {
+//     counts[word] = (counts[word] || 0) + 1;
+//     return counts;
+//   }, {});
+  
+//   let sortedKeywords = Object.keys(keywordFrequencies).sort((a, b) => keywordFrequencies[b] - keywordFrequencies[a]);
+  
+//   let topKeywords = sortedKeywords.slice(0, 3); // Take top 3
+
+//   return topKeywords.join(' ');
+// }
+
+// Test it out
+let text = "I would like to know more about the climate change and its impacts.";
+let name = extractKeywords(text);
+console.log(name); // might output something like "climate change impacts"
