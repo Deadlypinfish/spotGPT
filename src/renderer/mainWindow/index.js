@@ -110,8 +110,8 @@ function setActiveChat(chatId, chatName) {
 
   // If the list item is not found, create a new one
   if (!activeItem) {
-    const sideMenuList = document.querySelector('.side-menu ul'); // TODO get name
-    activeItem = createChatListItem({ id: chatId, chat_name: chatName }); // You need to decide what chat_name to use here
+    const sideMenuList = document.querySelector('.side-menu ul');
+    activeItem = createChatListItem({ id: chatId, chat_name: chatName });
     sideMenuList.appendChild(activeItem);
   }
 
