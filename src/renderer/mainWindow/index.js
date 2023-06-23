@@ -18,13 +18,22 @@ document
     
     let data = { query: userInput, id: activeChatID};
 
-    ipcRenderer.send("run-query", data);
+    try {
+      ipcRenderer.invoke("run-query", data);
+      // Handle any response here if needed
+    } catch (error) {
+      console.error(error);
+      // Handle error here
+    }
   });
 
 // Listen for 'api-response' event from main process
+// data [] [usermessage, assistant message]
 ipcRenderer.on("api-response", (event, data) => {
   console.log("api-response called");
-  console.log("message:" + data.message);
+  console.log(data);
+  console.log(data.messages);
+  console.log(data.chatName);
 
   var spinner = document.getElementById('spinner');
   var submitButton = document.getElementById('btn-submit-message');
@@ -34,10 +43,15 @@ ipcRenderer.on("api-response", (event, data) => {
 
   document.getElementById("user-input").value = '';
 
-  document.getElementById("active-chat-id").value = data.id;
+  document.getElementById("active-chat-id").value = data.messages[0].chatId;
   
-  document.getElementById("chat-response").innerText = data.message.content;
+  appendMessagesToChatContainer(data.messages);
+
+  setActiveChat(data.messages[0].chatId, data.chatName);
+  //document.getElementById("chat-response").innerText = data.message.content;
 });
+
+
 
 ipcRenderer.on('chat-list', (event, chats) => {
   // Render chat list...
@@ -45,18 +59,8 @@ ipcRenderer.on('chat-list', (event, chats) => {
   sideMenuList.innerHTML = '';
 
   for (let chat of chats) {
-      let li = document.createElement('li');
-      li.textContent = chat.chat_name;
-      li.id = chat.id; // Make sure chat has an id property
+      let li = createChatListItem(chat);
       sideMenuList.appendChild(li);
-
-      // Add click event listener
-      li.addEventListener('click', function() {
-          let chatId = this.id;
-
-          // Pass the id to main process
-          ipcRenderer.send('change-chat', chatId);
-      });
   }
 })
 
@@ -64,6 +68,19 @@ ipcRenderer.on('chat-messages', (event, messages) => {
   const chatMessagesContainer = document.querySelector('.chat-messages');
   // Clear the container first
   chatMessagesContainer.innerHTML = '';
+
+  appendMessagesToChatContainer(messages);
+
+  
+  const chatId = messages[0].chatId;
+  document.getElementById("active-chat-id").value = chatId;
+
+  setActiveChat(chatId);
+})
+
+// General method for appending messages to chat container
+function appendMessagesToChatContainer(messages) {
+  const chatMessagesContainer = document.querySelector('.chat-messages');
 
   messages.forEach(message => {
     const messageElement = document.createElement('div');
@@ -76,6 +93,44 @@ ipcRenderer.on('chat-messages', (event, messages) => {
 
     messageElement.appendChild(messageText);
     chatMessagesContainer.appendChild(messageElement);
-});
+  });
+}
 
-})
+function setActiveChat(chatId, chatName) {
+  // Get all list items from the side menu
+  const listItems = document.querySelectorAll('.side-menu ul li');
+
+  // Remove the "active" class from all list items
+  listItems.forEach(item => {
+    item.classList.remove('active');
+  });
+
+  // Try to find the list item with the matching id
+  let activeItem = document.getElementById(chatId);
+
+  // If the list item is not found, create a new one
+  if (!activeItem) {
+    const sideMenuList = document.querySelector('.side-menu ul'); // TODO get name
+    activeItem = createChatListItem({ id: chatId, chat_name: chatName }); // You need to decide what chat_name to use here
+    sideMenuList.appendChild(activeItem);
+  }
+
+  activeItem.classList.add('active');
+
+}
+
+function createChatListItem(chat) {
+  let li = document.createElement('li');
+  li.textContent = chat.chat_name;
+  li.id = chat.id;
+
+  // Add click event listener
+  li.addEventListener('click', function() {
+    let chatId = this.id;
+
+    // Pass the id to main process
+    ipcRenderer.send('change-chat', chatId);
+  });
+
+  return li;
+}

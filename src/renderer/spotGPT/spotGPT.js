@@ -15,10 +15,22 @@ document.addEventListener("DOMContentLoaded", (event) => {
       inputField.value = "";
       ipcRenderer.send("hide-window");
     } else if (e.key === "Enter") {
-      let text = inputField.value.trim();
+        console.log('Enter pressed');
+        let text = inputField.value.trim();
+        console.log(text);
       inputField.value = "";
       if (text) {
-        ipcRenderer.send("run-query", text);
+
+        try {
+
+            ipcRenderer.invoke("run-query", { query: text, id: ''});
+            // Handle any response here if needed
+          } catch (error) {
+            console.error(error);
+            // Handle error here
+          }
+
+          
         inputField.value = ""; // Clear the input field
         ipcRenderer.send("hide-window");
       }

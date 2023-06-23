@@ -13,26 +13,51 @@ const dbPath = path.join(__dirname, '..', 'database', 'chatDatabase.db');
 const dirPath = path.dirname(dbPath);
 
 
+let mainWindow, spotWindow;
+let tray = null;
 
-if (!fs.existsSync(dirPath)) {
-  fs.mkdirSync(dirPath, { recursive: true });
+let db;
+
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+async function startApp() {
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+
+    db = await initDatabase();
+    const chats = await queryChats(db);
+    await createMainWindow();
+
+    mainWindow.on('close', (event) => {
+      if(!app.isQuiting) {
+        event.preventDefault();
+        mainWindow.hide();
+      }
+    });
+
+    
+    mainWindow.webContents.send('chat-list', chats);
+
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 
 
 
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
-let mainWindow, spotWindow;
-let tray = null;
 
-const createMainWindow = () => {
+
+const createMainWindow = async () => {
     mainWindow = new BrowserWindow({
-      //width: 800,
-      width: 1800,
+      width: 800,
+      //width: 1800,
       height: 600,
       icon: path.join(__dirname, '..', 'assets', 'icon.png'),
       webPreferences: {
@@ -42,9 +67,9 @@ const createMainWindow = () => {
       },
     });
   
-    mainWindow.loadFile("src/renderer/mainWindow/index.html");    
+    await mainWindow.loadFile("src/renderer/mainWindow/index.html");    
     
-    mainWindow.webContents.openDevTools();
+    //mainWindow.webContents.openDevTools();
   
 };
 
@@ -69,15 +94,42 @@ const createSpotWindow = () => {
   //spotWindow.webContents.openDevTools();
 };
 
-function loadAndSendChatList() {
-  db.all(`SELECT * FROM chats`, [], (err, rows) => {
-    if (err) {
-      throw err;
-    }
 
-    mainWindow.webContents.send('chat-list', rows);
-    
-  })
+function initDatabase() {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+      if (err) reject(err);
+
+      db.serialize(() => {
+        db.run(`CREATE TABLE IF NOT EXISTS chats (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chat_name TEXT NOT NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chatId INTEGER NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(chatId) REFERENCES chats(id)
+        )`, (err) => {
+          if (err) reject(err);
+          resolve(db);
+        });
+      });
+    });
+  });
+}
+
+function queryChats(db) {
+  return new Promise((resolve, reject) => {
+    db.all("SELECT * FROM chats", [], (err, rows) => {
+      if (err) reject(err);
+      resolve(rows);
+    });
+  });
 }
 
 function getChatMessages(chatId) {
@@ -92,82 +144,14 @@ function getChatMessages(chatId) {
   });
 }
 
-function initDatabase() {
-  let db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
-    if (err && err.code == "SQLITE_CANTOPEN") {
-        createDatabase();
-        return;
-    } else if (err) {
-        console.log("Getting error " + err);
-        return;
-    }
-    runQueries(db);
-  });
-  
-  function createDatabase() {
-    // var newdb = new sqlite3.Database(dbPath, (err) => {
-    //     if (err) {
-    //         console.log("Getting error " + err);
-    //         return;
-    //     }
-    //     createTables(newdb);
-    // });
-    db.serialize(() => {
-      db.run(`CREATE TABLE IF NOT EXISTS chats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chat_name TEXT NOT NULL,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-              )`);
-    
-      db.run(`CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chatId INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(chatId) REFERENCES chats(id)
-              )`);
-    
-      db.run("PRAGMA foreign_keys = ON");
-    });
-  }
-  
-  // function createTables(newdb) {
-  //   newdb.exec(`
-  //     CREATE TABLE IF NOT EXISTS chats (
-  //       id INTEGER PRIMARY KEY AUTOINCREMENT,
-  //       chat_name TEXT NOT NULL,
-  //       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-  //     );
-  
-  //     CREATE TABLE IF NOT EXISTS messages (
-  //       id INTEGER PRIMARY KEY AUTOINCREMENT,
-  //       chatId INTEGER NOT NULL,
-  //       role TEXT NOT NULL,
-  //       content TEXT NOT NULL,
-  //       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-  //       FOREIGN KEY(chatId) REFERENCES chats(id)
-  //     );
-  
-  //     PRAGMA foreign_keys = ON;
-  //     `, ()  => {
-  //         runQueries(newdb);
-  //     });
-  // }
-  
-  function runQueries(db) {
-    // Implement your queries here.
-    loadAndSendChatList();
-  }
-}
-
 app.whenReady().then(() => {
-  createMainWindow();
+  
+  // Start the app
+  startApp();
+
 
   createSpotWindow();
 
-  initDatabase();
-  //loadAndSendChatList();
 
   tray = new Tray(path.join(__dirname, '..', 'assets', 'icon.png'));
   
@@ -199,12 +183,6 @@ app.whenReady().then(() => {
     mainWindow.show();
   })
 
-  mainWindow.on('close', (event) => {
-    if(!app.isQuiting) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
-  })
 
   //spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html')
 
@@ -256,85 +234,103 @@ app.on("will-quit", () => {
   unregister();
 });
 
-// Listen for 'query' events from the spotWindow
-//let data = { query: userInput, id: activeChatID};
-ipcMain.on("run-query", async (event, data) => {
-  console.log("query:" + data.query);
-
+const callApi = async (query) => {
   const openai = new OpenAIApi(configuration);
-  console.log("openai:" + openai);
+  const chatCompletion = await openai.createChatCompletion({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: query }],
+  });
+  return chatCompletion;
+};
 
-  try {
-    const chatCompletion = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo", // replace with the engine you're using
-      messages: [{ role: "user", content: data.query }],
-    });
-
-    console.log(chatCompletion.data.choices[0].message.content);
-
-    let activeChatId = data.id;
-    
+const saveMessages = async (chatId, userQuery, assistantResponse) => {
+  return new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
+      let chatName = '';
 
-      if(!activeChatId){
-        let chatName = extractKeywords(data.query);
+      if (!chatId) {
+        chatName = extractKeywords(userQuery);
 
-        db.run(`INSERT INTO chats(chat_name) VALUES(?)`, [chatName], function(err) {
+        db.run(`INSERT INTO chats(chat_name) VALUES(?)`, [chatName], function (err) {
           if (err) {
             console.error(err.message);
-            return db.run('ROLLBACK');
+            db.run('ROLLBACK');
+            reject(err);
+            return;
           }
-          activeChatId = this.lastID;
+          chatId = this.lastID;
 
           insertUserMessage();
         });
-      }else{
+      } else {
         insertUserMessage();
       }
 
-      function insertUserMessage(){
-        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'user', data.query], function(err) {
+      function insertUserMessage() {
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'user', userQuery], function (err) {
           if (err) {
             console.error(err.message);
-            return db.run('ROLLBACK');
+            db.run('ROLLBACK');
+            reject(err);
+            return;
           }
 
           insertAssistantMessage();
         });
       }
 
-      function insertAssistantMessage(){
-        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [activeChatId, 'assistant', chatCompletion.data.choices[0].message.content], function(err) {
+      function insertAssistantMessage() {
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'assistant', assistantResponse], function (err) {
           if (err) {
             console.error(err.message);
-            return db.run('ROLLBACK');
+            db.run('ROLLBACK');
+            reject(err);
+            return;
           }
 
-          db.run('COMMIT', function(err){
-            if(err){
+          db.run('COMMIT', function (err) {
+            if (err) {
               console.error(err.message);
-              return db.run('ROLLBACK');
+              db.run('ROLLBACK');
+              reject(err);
+              return;
             }
 
-            // If no errors, commit the transaction
-            loadAndSendChatList();
-            
-            try {
-              const messages = getChatMessages(chatId).then(() =>{
-                mainWindow.webContents.send('chat-messages', messages);
-              });
-            } catch (err) {
-              console.error(err);
+            const userMessage = {
+              chatId: chatId,
+              role: 'user',
+              content: userQuery,
+              createdAt: new Date()
             }
-            
-            
-            mainWindow.show();
-            mainWindow.webContents.send('api-response', { message: chatCompletion.data.choices[0].message, id: activeChatId } );
+
+            const assistantMessage = {
+              chatId: chatId,
+              role: 'assistant',
+              content: assistantResponse,
+              createdAt: new Date()
+            }
+
+            resolve([[userMessage, assistantMessage],chatName]);
           });
         });
       }
-      
+    });
+  });
+};
+
+ipcMain.handle('run-query', async (event, data) => {
+  try {
+    const chatCompletion = await callApi(data.query);
+
+    const result = await saveMessages(data.id, data.query, chatCompletion.data.choices[0].message.content);
+    const messages = result[0];
+    const chatName = result[1];
+
+    // Send the data to the renderer process
+    mainWindow.webContents.send('api-response', {
+      messages: messages,
+      chatName: chatName
     });
   } catch (error) {
     console.error(error);
@@ -419,6 +415,6 @@ function extractKeywords(text) {
 // }
 
 // Test it out
-let text = "I would like to know more about the climate change and its impacts.";
-let name = extractKeywords(text);
-console.log(name); // might output something like "climate change impacts"
+// let text = "I would like to know more about the climate change and its impacts.";
+// let name = extractKeywords(text);
+// console.log(name); // might output something like "climate change impacts"
