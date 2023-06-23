@@ -149,3 +149,26 @@ body {
     margin-bottom: 20px;
     align-self:flex-end;
 }
+
+/* Hide the default scrollbars */
+::-webkit-scrollbar {
+    width: 8px; /* Adjust the width as needed */
+    background-color: #ffffff00; /* Set the background color */
+    
+  }
+  
+  /* Track */
+  ::-webkit-scrollbar-track {
+    background: #ffffff00; /* Set the track background color */
+  }
+  
+  /* Handle */
+  ::-webkit-scrollbar-thumb {
+    background: #ffffff87; /* Set the scrollbar handle color */
+    border-radius:10px;
+  }
+  
+  /* Handle on hover */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ffffffb0; /* Set the scrollbar handle color on hover */
+  }
