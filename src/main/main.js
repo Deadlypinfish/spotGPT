@@ -230,13 +230,8 @@ app.whenReady().then(() => {
   //spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html')
 
   // Register global shortcut
-  const ret = globalShortcut.register("CommandOrControl+Shift+Space", () => {
-    if (spotWindow.isVisible()) {
-      spotWindow.hide();
-    } else {
-      spotWindow.show();
-    }
-  });
+  let registerShortcut = true;
+  const ret = toggleShortcut(registerShortcut);
 
   if (!ret) console.log("registration failed");
 
@@ -384,6 +379,33 @@ const saveMessages = async ({id: chatId, query: userQuery, chatName: chatName}, 
   });
 };
 
+ipcMain.on('delete-chats', (event, chatIds) => {
+  console.log('delete chats called');
+  console.log(chatIds);
+});
+
+ipcMain.on('toggle-shortcut', (event, isEditListMode) => {
+  toggleShortcut(isEditListMode);
+});
+
+function toggleShortcut(registerShortcut) {
+
+  if (registerShortcut) {
+    globalShortcut.register("CommandOrControl+Shift+Space", () => {
+      if (spotWindow.isVisible()) {
+        spotWindow.hide();
+      } else {
+        spotWindow.show();
+      }
+    });
+  }
+  else {
+    globalShortcut.unregister('CommandOrControl+Shift+Space');
+  }
+  
+
+}
+
 ipcMain.handle('run-query', async (event, data) => {
   try {
     // Get the previous messages
@@ -407,7 +429,7 @@ ipcMain.handle('run-query', async (event, data) => {
       //   isArchived:false,
       //   isCloseToArchive: false
       // });
-      
+
       mainWindow.webContents.send('loading', data.chatName);
 
     }

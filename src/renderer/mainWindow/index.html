@@ -13,7 +13,12 @@
 
     <div class="app">
         <div class="side-menu">
-            <button onclick="newChat_Click();" class="btn-new-chat">New chat</button>
+            <div>
+                <button onclick="newChat_Click();" class="btn-new-chat">New chat</button>
+                <button onclick="editList_Click();" class="btn-edit-list">Edit</button>
+                <button onclick="deleteSelected_Click();" class="btn-delete-selected" style="display: none;">Delete</button>
+
+            </div>
             <ul>
             </ul>
         </div>

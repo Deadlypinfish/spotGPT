@@ -1,5 +1,7 @@
 const { ipcRenderer } = require("electron");
 
+let isEditListMode = false;
+
 document
   .getElementById("chat-form")
   .addEventListener("submit", function (event) {
@@ -31,6 +33,41 @@ document
       // Handle error here
     }
   });
+
+function editList_Click() {
+  isEditListMode = !isEditListMode;
+
+  let checkboxes = document.querySelectorAll('.edit-list-checkbox');
+
+  if (isEditListMode) {
+    document.querySelector('.btn-edit-list').innerHTML = 'Cancel';
+    document.querySelector('.btn-delete-selected').style.display = 'inline-block';
+
+    document.getElementById("user-input").disabled = true;
+  }
+  else {
+    document.querySelector('.btn-edit-list').innerHTML = 'Edit';
+    document.querySelector('.btn-delete-selected').style.display = 'none';
+    
+    document.getElementById("user-input").disabled = false;
+  }
+
+  ipcRenderer.send('toggle-shortcut', !isEditListMode);
+
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+    checkbox.style.display = isEditListMode ? 'inline' : 'none';
+  })
+}
+
+
+function deleteSelected_Click() {
+  let checkedBoxes = document.querySelectorAll('.edit-list-checkbox:checked');
+  let idsToDelete = Array.from(checkedBoxes).map(box => box.dataset.chatId); // Use the data attribute
+
+
+  ipcRenderer.send('delete-chats', idsToDelete);
+}
 
 function newChat_Click() {
   document.getElementById("user-input").value = '';
@@ -234,15 +271,36 @@ function setActiveChat(chatId, chatName) {
 
 function createChatListItem(chat) {
   let li = document.createElement('li');
-  li.textContent = chat.chat_name;
+
+  // create a checkbox and hide it initially
+  let checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.classList.add('edit-list-checkbox');
+  checkbox.dataset.chatId = chat.id;
+  checkbox.style.display = 'none'; // hide it initially
+  checkbox.addEventListener('click', function(event) {
+    event.stopPropagation();
+  })
+
+  li.appendChild(checkbox);
+  li.appendChild(document.createTextNode(chat.chat_name));
   li.id = chat.id;
+
+  // li.textContent = chat.chat_name;
+  // li.id = chat.id;
 
   // Add click event listener
   li.addEventListener('click', function() {
     let chatId = this.id;
 
-    // Pass the id to main process
-    ipcRenderer.send('change-chat', chatId);
+    if (isEditListMode) {
+      //event.preventDefault();
+      //let checkbox = document.getElementById(`checkbox-${chatId}`);
+      checkbox.checked = !checkbox.checked;
+    } else {
+      // Pass the id to main process
+      ipcRenderer.send('change-chat', chatId);
+    }
   });
 
   return li;
