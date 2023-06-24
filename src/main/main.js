@@ -494,7 +494,9 @@ function getChatInfo(chatId) {
 
 function extractKeywords(text) {
   // Convert text to lower case and split it into an array of words
-  let words = text.toLowerCase().split(/\W+/);
+  //let words = text.toLowerCase().split(/\W+/);
+  let words = text.toLowerCase().split(/(?:(?:[^a-zA-Z']+)|(?:'(?![a-z])))+/);
+
 
   // Remove stop words
   let keywords = removeStopwords(words);
@@ -511,7 +513,13 @@ function extractKeywords(text) {
   // Take the top 3 most frequent words
   let topKeywords = sortedKeywords.slice(0, 5);
 
-  return topKeywords.join(' ');
+  let title = topKeywords.map(capitalizeFirstLetter).join(' ');
+
+  return title;
+}
+
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 // function extractKeywords(text) {

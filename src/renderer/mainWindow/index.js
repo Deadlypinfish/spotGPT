@@ -80,7 +80,7 @@ ipcRenderer.on("api-response", (event, data) => {
     console.warn("The chat is close to the archive limit.");
   }
   else {
-    document.querySelector('#chat-warning').style.display = 'block';
+    document.querySelector('#chat-warning').style.display = 'none';
   }
 
 });
@@ -134,7 +134,7 @@ ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}
     console.warn("The chat is close to the archive limit.");
   }
   else {
-    document.querySelector('#chat-warning').style.display = 'block';
+    document.querySelector('#chat-warning').style.display = 'none';
   }
 })
 
