@@ -45,6 +45,8 @@ ipcRenderer.on("api-response", (event, data) => {
   console.log(data);
   console.log(data.messages);
   console.log(data.chatName);
+  console.log(data.isArchived);
+  console.log(data.isCloseToArchive);
 
   var spinner = document.getElementById('spinner');
   var submitButton = document.getElementById('btn-submit-message');
@@ -60,6 +62,17 @@ ipcRenderer.on("api-response", (event, data) => {
 
   setActiveChat(data.messages[0].chatId, data.chatName);
   //document.getElementById("chat-response").innerText = data.message.content;
+
+  if (data.isArchived) {
+    document.getElementById("user-input").disabled = true;
+  } else {
+    document.getElementById("user-input").disabled = false;
+  }
+  
+  if (data.isCloseToArchive) {
+    console.warn("The chat is close to the archive limit.");
+  }
+
 });
 
 
@@ -75,7 +88,7 @@ ipcRenderer.on('chat-list', (event, chats) => {
   }
 })
 
-ipcRenderer.on('chat-messages', (event, messages) => {
+ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}) => {
   const chatMessagesContainer = document.querySelector('.chat-messages');
   // Clear the container first
   chatMessagesContainer.innerHTML = '';
@@ -88,6 +101,16 @@ ipcRenderer.on('chat-messages', (event, messages) => {
   document.getElementById("active-chat-id").value = chatId;
 
   setActiveChat(chatId);
+
+  if (isArchived) {
+    document.getElementById("user-input").disabled = true;
+  } else {
+    document.getElementById("user-input").disabled = false;
+  }
+  
+  if (isCloseToArchive) {
+    console.warn("The chat is close to the archive limit.");
+  }
 })
 
 // General method for appending messages to chat container
@@ -100,10 +123,8 @@ function appendMessagesToChatContainer(messages) {
     // Use 'r-assistant' class for assistant's messages and 'r-user' for user's messages
     messageElement.classList.add(message.role === 'assistant' ? 'r-assistant' : 'r-user');
 
-    const messageText = document.createElement('p');
-    messageText.textContent = message.content;
+    messageElement.textContent = message.content;
 
-    messageElement.appendChild(messageText);
     chatMessagesContainer.appendChild(messageElement);
   });
 }

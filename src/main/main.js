@@ -112,7 +112,9 @@ function initDatabase() {
         db.run(`CREATE TABLE IF NOT EXISTS chats (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           chat_name TEXT NOT NULL,
-          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          isArchived BOOLEAN DEFAULT 0,
+          total_tokens INTEGER DEFAULT 0
         )`);
 
         db.run(`CREATE TABLE IF NOT EXISTS messages (
@@ -142,10 +144,25 @@ function queryChats(db) {
 
 function getChatMessages(chatId) {
   return new Promise((resolve, reject) => {
-    db.all(`SELECT * FROM messages WHERE chatId = ? ORDER BY createdAt, id`, chatId, (err, rows) => {
+    // db.all(`SELECT * FROM messages WHERE chatId = ? ORDER BY createdAt, id`, chatId, (err, rows) => {
+    //   if (err) {
+    //     reject(err);
+    //   } else {
+    //     let allMessages = rows.map(row => row.content).join(' ');
+    //     let tokenCountEstimate = Math.floor(allMessages.length / 3.5);
+
+    //     resolve({messages: rows, tokenCount: tokenCountEstimate});
+    //   }
+    // });
+    db.all(`SELECT c.total_tokens, m.* FROM chats c JOIN messages m ON c.id = m.chatId WHERE m.chatId = ? ORDER BY m.createdAt, m.id`, chatId, (err, rows) => {
       if (err) {
         reject(err);
       } else {
+        // total_tokens will be same in all rows for the same chatId
+        // so, we take it from the first row
+        //const totalTokens = rows.length ? rows[0].total_tokens : 0;
+
+        //resolve({messages: rows, tokenCount: tokenCountEstimate});
         resolve(rows);
       }
     });
@@ -263,7 +280,7 @@ const callApi = async (messages) => {
 //   return chatCompletion;
 // };
 
-const saveMessages = async (chatId, userQuery, assistantResponse) => {
+const saveMessages = async ({id: chatId, query: userQuery}, chatCompletion) => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
@@ -272,7 +289,7 @@ const saveMessages = async (chatId, userQuery, assistantResponse) => {
       if (!chatId) {
         chatName = extractKeywords(userQuery);
 
-        db.run(`INSERT INTO chats(chat_name) VALUES(?)`, [chatName], function (err) {
+        db.run(`INSERT INTO chats(chat_name, total_tokens) VALUES(?, ?)`, [chatName, chatCompletion.data.usage.total_tokens], function (err) {
           if (err) {
             console.error(err.message);
             db.run('ROLLBACK');
@@ -284,7 +301,17 @@ const saveMessages = async (chatId, userQuery, assistantResponse) => {
           insertUserMessage();
         });
       } else {
-        insertUserMessage();
+        //updateTokenTotal(chatCompletion.data.choices[0].message.content);
+        //insertUserMessage();
+        db.run(`UPDATE chats SET total_tokens = ? WHERE id = ?`, [chatCompletion.data.usage.total_tokens, chatId], function (err) {
+          if (err) {
+            console.error(err.message);
+            db.run('ROLLBACK');
+            reject(err);
+            return;
+          }
+          insertUserMessage();
+        })
       }
 
       function insertUserMessage() {
@@ -301,7 +328,7 @@ const saveMessages = async (chatId, userQuery, assistantResponse) => {
       }
 
       function insertAssistantMessage() {
-        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'assistant', assistantResponse], function (err) {
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'assistant', chatCompletion.data.choices[0].message.content], function (err) {
           if (err) {
             console.error(err.message);
             db.run('ROLLBACK');
@@ -327,7 +354,7 @@ const saveMessages = async (chatId, userQuery, assistantResponse) => {
             const assistantMessage = {
               chatId: chatId,
               role: 'assistant',
-              content: assistantResponse,
+              content: chatCompletion.data.choices[0].message.content,
               createdAt: new Date()
             }
 
@@ -343,8 +370,13 @@ ipcMain.handle('run-query', async (event, data) => {
   try {
     // Get the previous messages
     let previousMessages = [];
+    let tokenCount = 0;
     if (data.id) {
       previousMessages = await getChatMessages(data.id);
+      tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
+      //const result = await getChatMessages(data.id);
+      //previousMessages = result.messages;
+      //tokenCount = result.tokenCount;
     }
 
     // Convert previous messages into the format expected by OpenAI API
@@ -357,15 +389,32 @@ ipcMain.handle('run-query', async (event, data) => {
     messages.push({ role: "user", content: data.query });
 
     const chatCompletion = await callApi(messages);
+    console.dir(chatCompletion);
+    console.log(chatCompletion.data.usage.total_tokens);
 
-    const result = await saveMessages(data.id, data.query, chatCompletion.data.choices[0].message.content);
+    const result = await saveMessages(data, chatCompletion);
     const savedMessages = result[0];
     const chatName = result[1];
+
+    let isArchived = false;
+    let isCloseToArchive = false;
+    //const tokenCount = estimateTokenCount(messages);
+    if (chatCompletion.data.usage.total_tokens > 3200) {
+      // Warn the user
+      isCloseToArchive = true;
+    }
+    else if (chatCompletion.data.usage.total_tokens > 3900) {
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      // Disable input for this chat and inform the user
+      isArchived = true;
+    }
 
     // Send the data to the renderer process
     mainWindow.webContents.send('api-response', {
       messages: savedMessages,
-      chatName: chatName
+      chatName: chatName,
+      isArchived: isArchived,
+      isCloseToArchive: isCloseToArchive
     });
   } catch (error) {
     console.error(error);
@@ -382,12 +431,45 @@ ipcMain.on('change-chat', async (event, chatId) => {
   // Query the messages for the selected chat and send them back to renderer process
   // You can use the `chatId` to select the right messages from your database.
   try {
+    //const {messages, tokenCount } = await getChatMessages(chatId);
     const messages = await getChatMessages(chatId);
-    mainWindow.webContents.send('chat-messages', messages);
+    const tokenCount = messages.length ? messages[0].total_tokens : 0;
+
+    let isCloseToArchive = false;
+    let isArchived = false;
+
+    if (tokenCount > 3200) {
+      isCloseToArchive = true;
+    }
+    else if (tokenCount > 3900) {
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      // Disable input for this chat and inform the user
+      isArchived = true;
+    }
+
+    const chat = await getChatInfo(chatId);
+
+    mainWindow.webContents.send('chat-messages', {
+      messages: messages,
+      isArchived:chat.isArchived || isArchived,
+      isCloseToArchive: isCloseToArchive
+    });
   } catch (err) {
     console.error(err);
   }
 });
+
+function getChatInfo(chatId) {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT * FROM chats WHERE id = ?`, chatId, (err, row) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(row);
+      }
+    });
+  });
+}
 
 
 // function extractKeywords(text) {
@@ -402,6 +484,12 @@ ipcMain.on('change-chat', async (event, chatId) => {
 //   const chatName = Array.from(new Set(keywords)).join(' ');
 
 //   return chatName;
+// }
+
+// function estimateTokenCount(messages) {
+//   const allContent = messages.map(message => message.content).join(' ');
+
+//   return Math.ceil(allContent.length / 3.5);
 // }
 
 function extractKeywords(text) {
