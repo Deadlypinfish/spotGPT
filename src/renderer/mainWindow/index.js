@@ -64,13 +64,23 @@ ipcRenderer.on("api-response", (event, data) => {
   //document.getElementById("chat-response").innerText = data.message.content;
 
   if (data.isArchived) {
-    document.getElementById("user-input").disabled = true;
+    document.querySelector(".chat-input").style.display = 'none';
+    document.querySelector("#chat-archived").style.display = 'block';
+    // document.getElementById("user-input").disabled = true;
+    // document.getElementById("btn-submit-message").disabled = true;
+    // document.getElementById("btn-submit-message").style.display = 'none';
   } else {
-    document.getElementById("user-input").disabled = false;
+    document.querySelector("#chat-archived").style.display = 'none';
+    document.querySelector(".chat-input").style.display = 'block';
   }
   
+
   if (data.isCloseToArchive) {
+    document.querySelector('#chat-warning').style.display = 'block';
     console.warn("The chat is close to the archive limit.");
+  }
+  else {
+    document.querySelector('#chat-warning').style.display = 'block';
   }
 
 });
@@ -103,13 +113,28 @@ ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}
   setActiveChat(chatId);
 
   if (isArchived) {
-    document.getElementById("user-input").disabled = true;
+    document.querySelector(".chat-input").style.display = 'none';
+    document.querySelector("#chat-archived").style.display = 'block';
+    // document.getElementById("user-input").disabled = true;
+    // document.getElementById("btn-submit-message").disabled = true;
+    // document.getElementById("btn-submit-message").style.display = 'none';
   } else {
-    document.getElementById("user-input").disabled = false;
+    document.querySelector(".chat-input").style.display = 'block';
+    document.querySelector("#chat-archived").style.display = 'none';
   }
+
+  // if (isArchived) {
+  //   document.getElementById("user-input").disabled = true;
+  // } else {
+  //   document.getElementById("user-input").disabled = false;
+  // }
   
   if (isCloseToArchive) {
+    document.querySelector('#chat-warning').style.display = 'block';
     console.warn("The chat is close to the archive limit.");
+  }
+  else {
+    document.querySelector('#chat-warning').style.display = 'block';
   }
 })
 

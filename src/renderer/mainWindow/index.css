@@ -19,7 +19,7 @@ body {
     background: #202123;
     width: 260px;
     min-width: 260px;
-    padding: 20px;
+    padding: 1em;
 }
 
 .side-menu ul {
@@ -54,12 +54,26 @@ body {
     flex-direction: column;
     flex-grow: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 1em;
+}
+
+#chat-warning, #chat-archived {
+    padding: 1em;
+    text-align: center;
+    font-size: .75rem;
+}
+
+#chat-warning {
+    background: #ffffa14f;
+}
+
+#chat-archived {
+    background: #ff6c6c4f;
 }
 
 .chat-input {
     flex-shrink: 0;
-    padding: 20px;
+    padding: 1em;
     border-top: 1px solid #dddddd38;
     position: relative;
 }
