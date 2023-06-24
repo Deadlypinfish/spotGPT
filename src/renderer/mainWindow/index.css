@@ -76,7 +76,7 @@ body {
 
 .chat-input input#user-input {
     display: inline-block;
-    width: calc(100% - 40px);
+    width: calc(100% - 6em);
     height: 100%;
     font-size: 1.2em;
     border-radius: 5px;
@@ -89,6 +89,7 @@ body {
     font-family: arial;
     /* padding-left: 10px; */
     padding: 1em;
+    padding-right: 5em;
 }
 
 #btn-submit-message {
@@ -133,11 +134,30 @@ body {
     }
 }
 
+.btn-new-chat {
+    padding: 0.5rem;
+    width: 100%;
+    margin-bottom: 15px;
+    background: #40414f;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.btn-new-chat:hover {
+    background: #535465;
+}
+
+.r-assistant, .r-user {
+    max-width: calc(90% - 50px);
+}
+
 .r-assistant {
     background-color: #525467;
     padding: 20px;
     border-radius: 5px 5px 5px 0px;
-    width: 90%;
+    /* width: 90%; */
     margin-bottom: 20px;
 }
 
@@ -145,7 +165,7 @@ body {
     background-color: cadetblue;
     padding: 20px;
     border-radius: 5px 5px 0px 5px;
-    width: 90%;
+    /* width: 90%; */
     margin-bottom: 20px;
     align-self:flex-end;
 }

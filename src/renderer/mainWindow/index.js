@@ -27,6 +27,17 @@ document
     }
   });
 
+function newChat_Click() {
+  document.getElementById("user-input").value = '';
+  document.getElementById("active-chat-id").value = '';
+
+
+  document.querySelector('.chat-messages').innerHTML = '';
+  clearActive();
+
+  document.getElementById("user-input").focus();
+}
+
 // Listen for 'api-response' event from main process
 // data [] [usermessage, assistant message]
 ipcRenderer.on("api-response", (event, data) => {
@@ -68,6 +79,7 @@ ipcRenderer.on('chat-messages', (event, messages) => {
   const chatMessagesContainer = document.querySelector('.chat-messages');
   // Clear the container first
   chatMessagesContainer.innerHTML = '';
+  document.getElementById("user-input").value = '';
 
   appendMessagesToChatContainer(messages);
 
@@ -96,14 +108,17 @@ function appendMessagesToChatContainer(messages) {
   });
 }
 
-function setActiveChat(chatId, chatName) {
-  // Get all list items from the side menu
+function clearActive() {
   const listItems = document.querySelectorAll('.side-menu ul li');
 
   // Remove the "active" class from all list items
   listItems.forEach(item => {
     item.classList.remove('active');
   });
+}
+
+function setActiveChat(chatId, chatName) {
+  clearActive();
 
   // Try to find the list item with the matching id
   let activeItem = document.getElementById(chatId);
