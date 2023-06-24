@@ -244,14 +244,24 @@ app.on("will-quit", () => {
   unregister();
 });
 
-const callApi = async (query) => {
+const callApi = async (messages) => {
   const openai = new OpenAIApi(configuration);
   const chatCompletion = await openai.createChatCompletion({
     model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: query }],
+    messages: messages,
   });
   return chatCompletion;
 };
+
+
+// const callApi = async (query) => {
+//   const openai = new OpenAIApi(configuration);
+//   const chatCompletion = await openai.createChatCompletion({
+//     model: "gpt-3.5-turbo",
+//     messages: [{ role: "user", content: query }],
+//   });
+//   return chatCompletion;
+// };
 
 const saveMessages = async (chatId, userQuery, assistantResponse) => {
   return new Promise((resolve, reject) => {
@@ -331,15 +341,30 @@ const saveMessages = async (chatId, userQuery, assistantResponse) => {
 
 ipcMain.handle('run-query', async (event, data) => {
   try {
-    const chatCompletion = await callApi(data.query);
+    // Get the previous messages
+    let previousMessages = [];
+    if (data.id) {
+      previousMessages = await getChatMessages(data.id);
+    }
+
+    // Convert previous messages into the format expected by OpenAI API
+    const messages = previousMessages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    // Add the new user message
+    messages.push({ role: "user", content: data.query });
+
+    const chatCompletion = await callApi(messages);
 
     const result = await saveMessages(data.id, data.query, chatCompletion.data.choices[0].message.content);
-    const messages = result[0];
+    const savedMessages = result[0];
     const chatName = result[1];
 
     // Send the data to the renderer process
     mainWindow.webContents.send('api-response', {
-      messages: messages,
+      messages: savedMessages,
       chatName: chatName
     });
   } catch (error) {
