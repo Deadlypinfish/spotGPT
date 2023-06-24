@@ -22,6 +22,9 @@ const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+app.setName('spotGPT');
+
+
 async function startApp() {
   try {
     if (!fs.existsSync(dirPath)) {
@@ -56,6 +59,7 @@ async function startApp() {
 
 const createMainWindow = async () => {
     mainWindow = new BrowserWindow({
+      title: "spotGPT",
       width: 800,
       //width: 1800,
       height: 600,
@@ -67,9 +71,11 @@ const createMainWindow = async () => {
       },
     });
   
-    await mainWindow.loadFile("src/renderer/mainWindow/index.html");    
+    const mainWindowPath = path.join(__dirname, '..', 'renderer', 'mainWindow', 'index.html');
+    await mainWindow.loadFile(mainWindowPath);
+    //await mainWindow.loadFile("src/renderer/mainWindow/index.html");    
     
-    //mainWindow.webContents.openDevTools();
+    mainWindow.webContents.openDevTools();
   
 };
 
@@ -90,7 +96,9 @@ const createSpotWindow = () => {
     },
   });
 
-  spotWindow.loadFile("src/renderer/spotGPT/spotGPT.html");
+  const spotWindowPath = path.join(__dirname, '..', 'renderer', 'spotGPT', 'spotGPT.html');
+  spotWindow.loadFile(spotWindowPath);
+  //spotWindow.loadFile("src/renderer/spotGPT/spotGPT.html");
   //spotWindow.webContents.openDevTools();
 };
 
@@ -205,7 +213,9 @@ app.whenReady().then(() => {
   });
 
   app.on('before-quit', () => {
-    isQuitting = true;
+    app.isQuiting = true;
+    if (mainWindow) mainWindow.destroy();
+    if (spotWindow) spotWindow.destroy();
   });
 
   spotWindow.on("blur", () => {
