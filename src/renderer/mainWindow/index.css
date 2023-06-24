@@ -151,11 +151,12 @@ body {
 
 .r-assistant, .r-user {
     max-width: calc(90% - 50px);
+    padding: .75em 1em;
 }
 
 .r-assistant {
     background-color: #525467;
-    padding: 20px;
+    /* padding: 20px; */
     border-radius: 5px 5px 5px 0px;
     /* width: 90%; */
     margin-bottom: 20px;
@@ -163,7 +164,7 @@ body {
 
 .r-user {
     background-color: cadetblue;
-    padding: 20px;
+    /* padding: 20px; */
     border-radius: 5px 5px 0px 5px;
     /* width: 90%; */
     margin-bottom: 20px;
