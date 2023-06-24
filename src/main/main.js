@@ -135,10 +135,28 @@ function initDatabase() {
 
 function queryChats(db) {
   return new Promise((resolve, reject) => {
-    db.all("SELECT * FROM chats", [], (err, rows) => {
+    let sql = `
+      SELECT 
+        c.*
+      FROM chats c
+      LEFT JOIN (
+        SELECT 
+          chatId, 
+          MAX(createdAt) AS createdAt 
+        FROM messages 
+        GROUP BY chatId
+      ) m ON c.id = m.chatId 
+      ORDER BY m.createdAt DESC;
+    `;
+    db.all(sql, [], (err, rows) => {
       if (err) reject(err);
       resolve(rows);
     });
+
+    // db.all("SELECT * FROM chats", [], (err, rows) => {
+    //   if (err) reject(err);
+    //   resolve(rows);
+    // });
   });
 }
 
@@ -212,7 +230,7 @@ app.whenReady().then(() => {
   //spotWindow.loadFile('src/renderer/spotGPT/spotGPT.html')
 
   // Register global shortcut
-  const ret = globalShortcut.register("CommandOrControl+Space", () => {
+  const ret = globalShortcut.register("CommandOrControl+Shift+Space", () => {
     if (spotWindow.isVisible()) {
       spotWindow.hide();
     } else {
@@ -222,7 +240,7 @@ app.whenReady().then(() => {
 
   if (!ret) console.log("registration failed");
 
-  console.log(globalShortcut.isRegistered("CommandOrControl+Space"));
+  console.log(globalShortcut.isRegistered("CommandOrControl+Shift+Space"));
 
   // Create windows
   app.on("activate", () => {
@@ -280,14 +298,14 @@ const callApi = async (messages) => {
 //   return chatCompletion;
 // };
 
-const saveMessages = async ({id: chatId, query: userQuery}, chatCompletion) => {
+const saveMessages = async ({id: chatId, query: userQuery, chatName: chatName}, chatCompletion) => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
-      let chatName = '';
+      //let chatName = '';
 
       if (!chatId) {
-        chatName = extractKeywords(userQuery);
+        //chatName = extractKeywords(userQuery);
 
         db.run(`INSERT INTO chats(chat_name, total_tokens) VALUES(?, ?)`, [chatName, chatCompletion.data.usage.total_tokens], function (err) {
           if (err) {
@@ -371,12 +389,27 @@ ipcMain.handle('run-query', async (event, data) => {
     // Get the previous messages
     let previousMessages = [];
     let tokenCount = 0;
+    //let chatName = '';
+
     if (data.id) {
       previousMessages = await getChatMessages(data.id);
       tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
       //const result = await getChatMessages(data.id);
       //previousMessages = result.messages;
       //tokenCount = result.tokenCount;
+    }
+    else {
+      data.chatName = extractKeywords(data.query);
+
+      // clear any potential messages in the main window since this is a new search
+      // mainWindow.webContents.send('chat-messages', {
+      //   messages: [],
+      //   isArchived:false,
+      //   isCloseToArchive: false
+      // });
+      
+      mainWindow.webContents.send('loading', data.chatName);
+
     }
 
     // Convert previous messages into the format expected by OpenAI API
@@ -394,7 +427,7 @@ ipcMain.handle('run-query', async (event, data) => {
 
     const result = await saveMessages(data, chatCompletion);
     const savedMessages = result[0];
-    const chatName = result[1];
+    //const chatName = result[1];
 
     let isArchived = false;
     let isCloseToArchive = false;
@@ -412,10 +445,14 @@ ipcMain.handle('run-query', async (event, data) => {
     // Send the data to the renderer process
     mainWindow.webContents.send('api-response', {
       messages: savedMessages,
-      chatName: chatName,
+      chatName: data.chatName,
       isArchived: isArchived,
       isCloseToArchive: isCloseToArchive
     });
+    
+    mainWindow.show();
+    mainWindow.focus();
+
   } catch (error) {
     console.error(error);
   }
@@ -515,6 +552,11 @@ function extractKeywords(text) {
 
   let title = topKeywords.map(capitalizeFirstLetter).join(' ');
 
+  // if extracting words prevented the title from existing just use the 
+  // original words
+  if (!title) {
+    title = words.map(capitalizeFirstLetter).join(' ');
+  }
   return title;
 }
 

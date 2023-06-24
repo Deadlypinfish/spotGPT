@@ -5,7 +5,12 @@ document
   .addEventListener("submit", function (event) {
     event.preventDefault();
 
+    // check if the input is already disabled and don't do anything
     let userInput = document.getElementById("user-input").value;
+    if (userInput.disabled == true) return;
+
+    userInput.disabled = true;
+
     let activeChatID = document.getElementById("active-chat-id").value;
 
     var spinner = document.getElementById('spinner');
@@ -38,6 +43,14 @@ function newChat_Click() {
   document.getElementById("user-input").focus();
 }
 
+function showLoading() {
+  var spinner = document.getElementById('spinner');
+  var submitButton = document.getElementById('btn-submit-message');
+
+  submitButton.style.display = 'none';
+  spinner.style.display = 'block';
+}
+
 // Listen for 'api-response' event from main process
 // data [] [usermessage, assistant message]
 ipcRenderer.on("api-response", (event, data) => {
@@ -55,6 +68,8 @@ ipcRenderer.on("api-response", (event, data) => {
   spinner.style.display = 'none';
 
   document.getElementById("user-input").value = '';
+  document.getElementById("user-input").disabled = false;
+  document.getElementById("user-input").focus();
 
   document.getElementById("active-chat-id").value = data.messages[0].chatId;
   
@@ -98,6 +113,32 @@ ipcRenderer.on('chat-list', (event, chats) => {
   }
 })
 
+ipcRenderer.on('loading', (event, chatName) => {
+  // clear container
+  const chatMessagesContainer = document.querySelector('.chat-messages');
+  chatMessagesContainer.innerHTML = '';
+
+  // clear input
+  document.getElementById("user-input").value = '';
+  document.getElementById("user-input").disabled = true;
+  document.getElementById("active-chat-id").value = '';
+
+  // show loading/don't allow input
+  showLoading();
+
+  // show potential new chat name 
+  if (chatName) {
+    //const sideMenuList = document.querySelector('.side-menu ul');
+    // TODO clear active
+
+    //let placeholderItem = createChatListItem({ id: "placeholder", chat_name: chatName });
+    //sideMenuList.prepend(placeholderItem);
+    setActiveChat('placeholder', chatName);
+
+    //placeholderItem.classList.add('active');
+  }
+})
+
 ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}) => {
   const chatMessagesContainer = document.querySelector('.chat-messages');
   // Clear the container first
@@ -107,10 +148,14 @@ ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}
   appendMessagesToChatContainer(messages);
 
   
-  const chatId = messages[0].chatId;
-  document.getElementById("active-chat-id").value = chatId;
+  const chatId = messages.length ? messages[0].chatId : null;
 
-  setActiveChat(chatId);
+  if (chatId) {
+    document.getElementById("active-chat-id").value = chatId;
+    setActiveChat(chatId);
+
+  }
+
 
   if (isArchived) {
     document.querySelector(".chat-input").style.display = 'none';
@@ -173,7 +218,14 @@ function setActiveChat(chatId, chatName) {
   if (!activeItem) {
     const sideMenuList = document.querySelector('.side-menu ul');
     activeItem = createChatListItem({ id: chatId, chat_name: chatName });
-    sideMenuList.appendChild(activeItem);
+
+    let placeholderItem = document.getElementById("placeholder");
+    if (placeholderItem) {
+      sideMenuList.replaceChild(activeItem, placeholderItem);
+    } else {
+      // If the placeholder doesn't exist for some reason, just prepend the actual item
+      sideMenuList.prepend(activeItem);
+    }
   }
 
   activeItem.classList.add('active');
