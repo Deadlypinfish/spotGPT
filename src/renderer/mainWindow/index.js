@@ -65,8 +65,10 @@ function deleteSelected_Click() {
   let checkedBoxes = document.querySelectorAll('.edit-list-checkbox:checked');
   let idsToDelete = Array.from(checkedBoxes).map(box => box.dataset.chatId); // Use the data attribute
 
+  if (idsToDelete.length > 0) {
+    ipcRenderer.send('delete-chats', idsToDelete);
+  }
 
-  ipcRenderer.send('delete-chats', idsToDelete);
 }
 
 function newChat_Click() {
@@ -249,14 +251,14 @@ function setActiveChat(chatId, chatName) {
   clearActive();
 
   // Try to find the list item with the matching id
-  let activeItem = document.getElementById(chatId);
+  let activeItem = document.getElementById(`chat-${chatId}`);
 
   // If the list item is not found, create a new one
   if (!activeItem) {
     const sideMenuList = document.querySelector('.side-menu ul');
     activeItem = createChatListItem({ id: chatId, chat_name: chatName });
 
-    let placeholderItem = document.getElementById("placeholder");
+    let placeholderItem = document.getElementById("chat-placeholder");
     if (placeholderItem) {
       sideMenuList.replaceChild(activeItem, placeholderItem);
     } else {
@@ -297,7 +299,7 @@ function createChatListItem(chat) {
 
   li.appendChild(label);
   //li.appendChild(document.createTextNode(chat.chat_name));
-  li.id = chat.id;
+  li.id = `chat-${chat.id}`;
   li.classList.add('chat-list-item');
 
   // li.textContent = chat.chat_name;
@@ -305,7 +307,7 @@ function createChatListItem(chat) {
 
   // Add click event listener
   li.addEventListener('click', function() {
-    let chatId = this.id;
+    let chatId = this.id.replace('chat-', '');
 
     if (isEditListMode) {
       event.preventDefault();
