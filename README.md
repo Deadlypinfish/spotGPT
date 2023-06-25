@@ -11,18 +11,18 @@ These instructions will get you a copy of the project up and running on your loc
 ### Installing
 Here are the steps to get the application running:
 
-*Step 1*: Clone the repository.
+**Step 1**: Clone the repository.
 ```bash
 git clone https://github.com/Deadlypinfish/spotGPT.git
 cd spotGPT
 ```
 
-*Step 2*: Install the project dependencies.
+**Step 2**: Install the project dependencies.
 ```bash
 npm install
 ```
 
-*Step 3*: The application needs your OpenAI API key to function properly. The key can be entered in the settings page within the application.
+**Step 3**: The application needs your OpenAI API key to function properly. The key can be entered in the settings page within the application.
 
 ### Running the Application
 To run the application:
