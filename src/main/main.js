@@ -382,6 +382,54 @@ const saveMessages = async ({id: chatId, query: userQuery, chatName: chatName}, 
 ipcMain.on('delete-chats', (event, chatIds) => {
   console.log('delete chats called');
   console.log(chatIds);
+
+  // Convert array to string and add parenthesis for the SQL query
+  const chatIdsString = `(${chatIds.join(',')})`;
+
+  db.serialize(() => {
+    db.run(`BEGIN TRANSACTION`);
+
+    // Delete messages from the chats first to maintain foreign key constraint
+    db.run(`DELETE FROM messages WHERE chatId IN ${chatIdsString}`, (err) => {
+      if (err) {
+        console.error(err.message);
+        db.run('ROLLBACK');
+        return;
+      }
+
+      // Delete chats
+      db.run(`DELETE FROM chats WHERE id IN ${chatIdsString}`, (err) => {
+        if (err) {
+          console.error(err.message);
+          db.run('ROLLBACK');
+          return;
+        }
+
+        db.run(`COMMIT`, async (err) => {
+          if (err) {
+            console.error(err.message);
+            db.run('ROLLBACK');
+            return;
+          }
+
+          console.log(`Chats with IDs ${chatIdsString} have been deleted`);
+
+          // Get updated chat list after delete
+          try {
+            const chats = await queryChats(db);
+            console.log(chats);
+            
+            mainWindow.webContents.send('chat-list', chats);
+          } catch(err) {
+            console.error('Error while fetching updated chats: ', err);
+          }
+
+
+        });
+      });
+    });
+  });
+
 });
 
 ipcMain.on('toggle-shortcut', (event, isEditListMode) => {

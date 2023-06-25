@@ -65,6 +65,9 @@ function deleteSelected_Click() {
   let checkedBoxes = document.querySelectorAll('.edit-list-checkbox:checked');
   let idsToDelete = Array.from(checkedBoxes).map(box => box.dataset.chatId); // Use the data attribute
 
+  editList_Click();
+  newChat_Click();
+
   if (idsToDelete.length > 0) {
     ipcRenderer.send('delete-chats', idsToDelete);
   }
