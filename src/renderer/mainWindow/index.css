@@ -42,6 +42,54 @@ body {
     background-color: #343541;
 }
 
+.chat-list-item {
+    display: flex;
+    gap: .5em;
+    align-items: baseline;
+}
+
+.form-control {
+    display: flex;
+    gap: .5em;
+    /* display: grid;
+    grid-template-columns: 1em auto;
+    gap: 0.5em; */
+}
+
+.chat-list-item .form-control input[type="checkbox"] {
+    /* Add if not using autoprefixer */
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: #202123;
+    margin: 0;
+    font: inherit;
+    color: currentColor;
+    width: 1em;
+    height: 1em;
+    border: 0.1em solid cadetblue;
+    border-radius: 0.25em;
+    flex-shrink: 0;
+
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.chat-list-item .form-control input[type="checkbox"]::before {
+    content: "";
+    width: 0.5em;
+    height: 0.5em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em cadetblue;
+  }
+
+.chat-list-item .form-control  input[type="checkbox"]:checked::before {
+    transform: scale(1);
+  }
+
+
 .chat-area {
     display: flex;
     flex-direction: column;
@@ -76,6 +124,13 @@ body {
     padding: 1em;
     border-top: 1px solid #dddddd38;
     position: relative;
+}
+
+.btn {
+    padding: 0.75em;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
 }
 
 .chat-input input#user-input:focus,
@@ -148,19 +203,38 @@ body {
     }
 }
 
+.btn-toolbar {
+    display: flex;
+    gap: .5em;
+    margin-bottom: .5em;
+    justify-content: space-between;
+}
+
 .btn-new-chat {
-    padding: 0.5rem;
-    width: 100%;
-    margin-bottom: 15px;
     background: #40414f;
-    border: none;
     color: white;
-    border-radius: 5px;
-    cursor: pointer;
+    flex: 1;
+}
+
+.btn-edit-list {
+    background: #5f606e;
+    color: white;
+}
+
+.btn-delete-selected {
+    background: #fd2a2a;
+    color:white;
 }
 
 .btn-new-chat:hover {
     background: #535465;
+}
+.btn-edit-list:hover {
+    background: #7a7b8b;
+}
+
+.btn-delete-selected:hover {
+    background: #ff4747;
 }
 
 .r-assistant, .r-user {

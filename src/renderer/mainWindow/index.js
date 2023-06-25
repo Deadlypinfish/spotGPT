@@ -56,7 +56,7 @@ function editList_Click() {
 
   checkboxes.forEach(checkbox => {
     checkbox.checked = false;
-    checkbox.style.display = isEditListMode ? 'inline' : 'none';
+    checkbox.style.display = isEditListMode ? 'flex' : 'none';
   })
 }
 
@@ -270,7 +270,17 @@ function setActiveChat(chatId, chatName) {
 }
 
 function createChatListItem(chat) {
+
+  /*
+  <label class="form-control">
+    <input type="checkbox" name="checkbox" />
+    Checkbox
+  </label>
+  */
   let li = document.createElement('li');
+
+  let label = document.createElement('label');
+  label.classList.add('form-control');
 
   // create a checkbox and hide it initially
   let checkbox = document.createElement('input');
@@ -282,9 +292,13 @@ function createChatListItem(chat) {
     event.stopPropagation();
   })
 
-  li.appendChild(checkbox);
-  li.appendChild(document.createTextNode(chat.chat_name));
+  label.appendChild(checkbox);
+  label.appendChild(document.createTextNode(chat.chat_name));
+
+  li.appendChild(label);
+  //li.appendChild(document.createTextNode(chat.chat_name));
   li.id = chat.id;
+  li.classList.add('chat-list-item');
 
   // li.textContent = chat.chat_name;
   // li.id = chat.id;
@@ -294,7 +308,7 @@ function createChatListItem(chat) {
     let chatId = this.id;
 
     if (isEditListMode) {
-      //event.preventDefault();
+      event.preventDefault();
       //let checkbox = document.getElementById(`checkbox-${chatId}`);
       checkbox.checked = !checkbox.checked;
     } else {
