@@ -95,6 +95,7 @@ body {
     flex-direction: column;
     flex: 3;
     background: #343541;
+    /* padding: 1em 2em; */
 }
 
 .chat-messages {
@@ -238,16 +239,28 @@ body {
 }
 
 .r-assistant, .r-user {
-    max-width: calc(90% - 50px);
+    /* max-width: calc(90% - 50px); */
+    max-width: 90%;
     padding: .75em 1em;
+
+    /* overflow-x: auto;
+    overflow-y: visible;
+    word-break: break-word; */
+    margin-bottom: 1.5em;
 }
+
+.r-assistant p, .r-user p {
+    /* Your styles here. For example: */
+    margin: 0;
+  padding: 0;
+  }
 
 .r-assistant {
     background-color: #525467;
     /* padding: 20px; */
     border-radius: 5px 5px 5px 0px;
     /* width: 90%; */
-    margin-bottom: 20px;
+    /* margin-bottom: 20px; */
 }
 
 .r-user {
@@ -255,9 +268,16 @@ body {
     /* padding: 20px; */
     border-radius: 5px 5px 0px 5px;
     /* width: 90%; */
-    margin-bottom: 20px;
+    /* margin-bottom: 20px; */
     align-self:flex-end;
 }
+
+.r-assistant pre, .r-assistant code {
+    white-space: pre-wrap;       /* css-3 */
+    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+  }
+
+  
 
 /* Hide the default scrollbars */
 ::-webkit-scrollbar {

@@ -1,4 +1,12 @@
 const { ipcRenderer } = require("electron");
+const { marked } = require('marked');
+
+
+const createDOMPurify = require('dompurify');
+const { JSDOM } = require('jsdom');
+
+const domWindow = new JSDOM('').window;
+const DOMPurify = createDOMPurify(domWindow);
 
 let isEditListMode = false;
 
@@ -235,7 +243,14 @@ function appendMessagesToChatContainer(messages) {
     // Use 'r-assistant' class for assistant's messages and 'r-user' for user's messages
     messageElement.classList.add(message.role === 'assistant' ? 'r-assistant' : 'r-user');
 
-    messageElement.textContent = message.content;
+    let htmlContent = marked.parse(message.content);
+
+
+    // Sanitize the HTML content
+    htmlContent = DOMPurify.sanitize(htmlContent);
+
+
+    messageElement.innerHTML = htmlContent;
 
     chatMessagesContainer.appendChild(messageElement);
   });
