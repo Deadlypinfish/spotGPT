@@ -2,6 +2,7 @@ const { app, Tray, Menu, BrowserWindow, globalShortcut, ipcMain } = require("ele
 const { Configuration, OpenAIApi } = require("openai");
 require("dotenv").config();
 
+const Store = require('../modules/Store')
 const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
@@ -18,9 +19,17 @@ let tray = null;
 
 let db;
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Define defaults for the Store
+const storeDefaults = {
+  OPENAI_API_KEY: '', // Default value for the OpenAI API key
+  // Add more defaults as needed
+}
+
+// Initialize a new Store with a config name and defaults
+const store = new Store({
+  configName: 'user-settings',
+  defaults: storeDefaults
+})
 
 app.setName('spotGPT');
 
@@ -49,13 +58,6 @@ async function startApp() {
     console.error(err);
   }
 }
-
-
-
-
-
-
-
 
 const createMainWindow = async () => {
     mainWindow = new BrowserWindow({
@@ -102,6 +104,14 @@ const createSpotWindow = () => {
   //spotWindow.webContents.openDevTools();
 };
 
+ipcMain.handle('get-api-key', (event) => {
+  const apiKey = store.get('OPENAI_API_KEY');
+  return apiKey;
+});
+
+ipcMain.handle('set-api-key', (event, apiKey) => {
+  store.set('OPENAI_API_KEY', apiKey);
+})
 
 function initDatabase() {
   return new Promise((resolve, reject) => {
@@ -220,6 +230,68 @@ app.whenReady().then(() => {
     }
   ]);
 
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'File',
+      submenu: [
+        { role: 'quit' } // "role": system prepared action menu
+        ,
+        {
+          label: 'Preferences',
+          click: () => {
+            const settingsWindow = new BrowserWindow(
+              { 
+                width: 500,
+                height: 500,
+                title: "spotGPT - Preferences",
+                icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+                webPreferences: {
+                  nodeIntegration: true,
+                  contextIsolation: false,
+                  //devTools: true
+                },
+              });
+
+            settingsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'settingsWindow', 'settings.html')) // Path to your settings form
+
+            settingsWindow.webContents.openDevTools();
+          }
+        }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forcereload' },
+        { role: 'toggledevtools' },
+        { type: 'separator' },
+        { role: 'resetzoom' },
+        { role: 'zoomin' },
+        { role: 'zoomout' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    // Other system prepared action menus: "Window", "Help"
+    
+  ])
+
+  
+  
+  Menu.setApplicationMenu(menu)
+
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
@@ -274,7 +346,7 @@ app.on("will-quit", () => {
   unregister();
 });
 
-const callApi = async (messages) => {
+const callApi = async (messages, configuration) => {
   const openai = new OpenAIApi(configuration);
   const chatCompletion = await openai.createChatCompletion({
     model: "gpt-3.5-turbo",
@@ -491,7 +563,11 @@ ipcMain.handle('run-query', async (event, data) => {
     // Add the new user message
     messages.push({ role: "user", content: data.query });
 
-    const chatCompletion = await callApi(messages);
+    const configuration = new Configuration({
+      apiKey: store.get('OPENAI_API_KEY')
+    });
+
+    const chatCompletion = await callApi(messages, configuration);
     console.dir(chatCompletion);
     console.log(chatCompletion.data.usage.total_tokens);
 
@@ -524,6 +600,11 @@ ipcMain.handle('run-query', async (event, data) => {
     mainWindow.focus();
 
   } catch (error) {
+    // reset and show error
+    // if there is not a chat id yet, we can remove the placeholder?
+    // or maybe put it back in the input text to try again. or do we still create the chat
+    // and save the single message to let them try again. 
+
     console.error(error);
   }
 });
