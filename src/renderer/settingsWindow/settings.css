@@ -4,4 +4,53 @@ body {
     background: #2c2c2c;
     color: white;
     min-width: 300px;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.container {
+    padding: 2em;
+}
+h1 {
+    margin-top: 0;
+}
+.settings-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-inputs {
+    display: flex;
+    flex-direction: row;
+    flex:1;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 3em;
+}
+
+#openaiAPIKey {
+    display: inline-block;
+    /* width: calc(100% - 6em); */
+    /* height: 100%; */
+    /* font-size: 1.2em; */
+    border-radius: 5px;
+    width: 50%;
+    background: #40414f;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    /* border: 1px solid #36323a; */
+    color: white;
+    font-family: arial;
+    /* padding-left: 10px; */
+    padding: 1em;
+    /* padding-right: 5em; */
+}
+
+#btn-save-preferences {
+    background-color: cadetblue;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    font-family: arial;
+    border-radius: 2px;
+    cursor: pointer;
 }

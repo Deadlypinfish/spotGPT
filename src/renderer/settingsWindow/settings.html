@@ -8,14 +8,22 @@
     <link rel="stylesheet" href="settings.css">
 </head>
 <body>
-    <h1>Preferences</h1>
+    <div class="container">
+        <h1>Preferences</h1>
 
-    <form id="settings-form">
-        <label for="openaiAPIKey">OpenAI API Key:</label>
-        <input type="password" id="openaiAPIKey" name="openaiAPIKey" required>
+        <form id="settings-form">
+            <div class="settings-panel">
+                <div class="settings-inputs">
+                    <label for="openaiAPIKey">OpenAI API Key:</label>
+                    <input type="password" id="openaiAPIKey" name="openaiAPIKey" required>
+                </div>
 
-        <button type="submit">Save</button>
-    </form>
+                
+                <button type="submit" id="btn-save-preferences">Save</button>
+            </div>
+        </form>
+    </div>
+
 
     <script src="settings.js"></script>
 </body>

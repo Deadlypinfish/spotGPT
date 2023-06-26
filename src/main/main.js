@@ -241,9 +241,10 @@ app.whenReady().then(() => {
           click: () => {
             const settingsWindow = new BrowserWindow(
               { 
-                width: 500,
-                height: 500,
+                width: 420,
+                height: 250,
                 title: "spotGPT - Preferences",
+                resizable: false,
                 icon: path.join(__dirname, '..', 'assets', 'icon.png'),
                 webPreferences: {
                   nodeIntegration: true,
