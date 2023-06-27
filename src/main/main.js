@@ -22,7 +22,9 @@ let db;
 // Define defaults for the Store
 const storeDefaults = {
   OPENAI_API_KEY: '', // Default value for the OpenAI API key
+  MODEL_ENGINE: '',
   // Add more defaults as needed
+
 }
 
 // Initialize a new Store with a config name and defaults
@@ -112,6 +114,37 @@ ipcMain.handle('get-api-key', (event) => {
 ipcMain.handle('set-api-key', (event, apiKey) => {
   store.set('OPENAI_API_KEY', apiKey);
 })
+
+ipcMain.handle('get-model-engine', (event) => {
+  const apiKey = store.get('MODEL_ENGINE');
+  return apiKey;
+});
+
+ipcMain.handle('set-model-engine', (event, engine) => {
+  store.set('MODEL_ENGINE', engine);
+});
+
+ipcMain.handle('get-model-engines-api', async (event) => {
+  const configuration = new Configuration({
+    apiKey: store.get('OPENAI_API_KEY')
+  });
+
+  const openai = new OpenAIApi(configuration);
+
+  let data = [];
+  
+
+try {
+  const response = await openai.listModels();
+  data = response.data;
+} catch (err) {
+console.error(err);
+
+}
+  
+  console.log(data);
+  return data;
+});
 
 function initDatabase() {
   return new Promise((resolve, reject) => {
@@ -349,8 +382,9 @@ app.on("will-quit", () => {
 
 const callApi = async (messages, configuration) => {
   const openai = new OpenAIApi(configuration);
+  const model = store.get('MODEL_ENGINE');
   const chatCompletion = await openai.createChatCompletion({
-    model: "gpt-3.5-turbo",
+    model: model,
     messages: messages,
   });
   return chatCompletion;
@@ -365,6 +399,96 @@ const callApi = async (messages, configuration) => {
 //   });
 //   return chatCompletion;
 // };
+
+async function createChatAndMessage(chatName, userQuery) {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+
+      db.run(`INSERT INTO chats(chat_name) VALUES(?)`, [chatName], function (err) {
+        if (err) {
+          console.error(err.message);
+          db.run('ROLLBACK');
+          reject(err);
+          return;
+        }
+        const chatId = this.lastID;
+
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'user', userQuery], function (err) {
+          if (err) {
+            console.error(err.message);
+            db.run('ROLLBACK');
+            reject(err);
+            return;
+          }
+
+          db.run('COMMIT', function (err) {
+            if (err) {
+              console.error(err.message);
+              db.run('ROLLBACK');
+              reject(err);
+              return;
+            }
+
+            const userMessage = {
+              chatId: chatId,
+              role: 'user',
+              content: userQuery,
+              createdAt: new Date()
+            }
+
+            resolve([chatId, userMessage]);
+          });
+        });
+      });
+    });
+  });
+};
+
+async function saveGptMessageAndUpdateChat(chatId, chatName, chatCompletion) {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+
+      db.run(`UPDATE chats SET total_tokens = ? WHERE id = ?`, [chatCompletion.data.usage.total_tokens, chatId], function (err) {
+        if (err) {
+          console.error(err.message);
+          db.run('ROLLBACK');
+          reject(err);
+          return;
+        }
+
+        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'assistant', chatCompletion.data.choices[0].message.content], function (err) {
+          if (err) {
+            console.error(err.message);
+            db.run('ROLLBACK');
+            reject(err);
+            return;
+          }
+
+          db.run('COMMIT', function (err) {
+            if (err) {
+              console.error(err.message);
+              db.run('ROLLBACK');
+              reject(err);
+              return;
+            }
+
+            const assistantMessage = {
+              chatId: chatId,
+              role: 'assistant',
+              content: chatCompletion.data.choices[0].message.content,
+              createdAt: new Date()
+            }
+
+            resolve([assistantMessage, chatName]);
+          });
+        });
+      });
+    });
+  });
+};
+
 
 const saveMessages = async ({id: chatId, query: userQuery, chatName: chatName}, chatCompletion) => {
   return new Promise((resolve, reject) => {
@@ -528,6 +652,65 @@ function toggleShortcut(registerShortcut) {
 }
 
 ipcMain.handle('run-query', async (event, data) => {
+  let previousMessages = [];
+  let tokenCount = 0;
+
+  try {
+    const isNewChat = !data.id;
+
+    if (data.id) {
+      previousMessages = await getChatMessages(data.id);
+      tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
+    } else {
+      data.chatName = extractKeywords(data.query);
+      data.id = await createChatAndMessage(data);
+
+      mainWindow.webContents.send('loading', data);
+    }
+
+
+    const messages = previousMessages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    messages.push({ role: "user", content: data.query });
+
+  } catch (error) {
+    // Send error to renderer process
+    mainWindow.webContents.send('db-operation-failed', data);
+    console.error(error);
+    return;  // Exit the function here if DB operation failed
+  }
+
+  try {
+    const configuration = new Configuration({
+      apiKey: store.get('OPENAI_API_KEY')
+    });
+
+    const chatCompletion = await callApi(messages, configuration);
+
+    if (isNewChat) {
+      await saveGptMessageAndUpdateChat(data.id, chatCompletion);
+    } else {
+      const result = await saveMessages(data, chatCompletion);
+    }
+
+    // other logic...
+    // TODO archive/warning
+
+    mainWindow.show();
+    mainWindow.focus();
+
+  } catch (error) {
+    // Send error to renderer process
+    mainWindow.webContents.send('api-call-failed', data);
+    console.error(error);
+  }
+});
+
+
+ipcMain.handle('run-query-old', async (event, data) => {
   try {
     // Get the previous messages
     let previousMessages = [];
@@ -605,6 +788,8 @@ ipcMain.handle('run-query', async (event, data) => {
     // if there is not a chat id yet, we can remove the placeholder?
     // or maybe put it back in the input text to try again. or do we still create the chat
     // and save the single message to let them try again. 
+
+    mainWindow.webContents.send('api-failed', data);
 
     console.error(error);
   }

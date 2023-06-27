@@ -150,6 +150,51 @@ ipcRenderer.on("api-response", (event, data) => {
 
 });
 
+ipcRenderer.on("db-operation-failed", (event, data) => {
+  console.log("db-operation-failed");
+  console.log(data);
+
+  var spinner = document.getElementById('spinner');
+  var submitButton = document.getElementById('btn-submit-message');
+
+  submitButton.style.display = 'block';
+  spinner.style.display = 'none';
+
+  // todo make this data query
+  document.getElementById("user-input").value = '';
+  document.getElementById("user-input").disabled = false;
+  document.getElementById("user-input").focus();
+
+  // if the chat id doesn't exist
+  document.getElementById("active-chat-id").value = data.messages[0].chatId;
+  
+  appendMessagesToChatContainer(data.messages);
+
+  setActiveChat(data.messages[0].chatId, data.chatName);
+  //document.getElementById("chat-response").innerText = data.message.content;
+
+  if (data.isArchived) {
+    document.querySelector(".chat-input").style.display = 'none';
+    document.querySelector("#chat-archived").style.display = 'block';
+    // document.getElementById("user-input").disabled = true;
+    // document.getElementById("btn-submit-message").disabled = true;
+    // document.getElementById("btn-submit-message").style.display = 'none';
+  } else {
+    document.querySelector("#chat-archived").style.display = 'none';
+    document.querySelector(".chat-input").style.display = 'block';
+  }
+  
+
+  if (data.isCloseToArchive) {
+    document.querySelector('#chat-warning').style.display = 'block';
+    console.warn("The chat is close to the archive limit.");
+  }
+  else {
+    document.querySelector('#chat-warning').style.display = 'none';
+  }
+
+});
+
 
 
 ipcRenderer.on('chat-list', (event, chats) => {
@@ -163,7 +208,7 @@ ipcRenderer.on('chat-list', (event, chats) => {
   }
 })
 
-ipcRenderer.on('loading', (event, chatName) => {
+ipcRenderer.on('loading', (event, data) => {
   // clear container
   const chatMessagesContainer = document.querySelector('.chat-messages');
   chatMessagesContainer.innerHTML = '';
@@ -177,13 +222,13 @@ ipcRenderer.on('loading', (event, chatName) => {
   showLoading();
 
   // show potential new chat name 
-  if (chatName) {
+  if (data.chatName) {
     //const sideMenuList = document.querySelector('.side-menu ul');
     // TODO clear active
 
     //let placeholderItem = createChatListItem({ id: "placeholder", chat_name: chatName });
     //sideMenuList.prepend(placeholderItem);
-    setActiveChat('placeholder', chatName);
+    setActiveChat(data.id, data.chatName);
 
     //placeholderItem.classList.add('active');
   }
@@ -276,13 +321,13 @@ function setActiveChat(chatId, chatName) {
     const sideMenuList = document.querySelector('.side-menu ul');
     activeItem = createChatListItem({ id: chatId, chat_name: chatName });
 
-    let placeholderItem = document.getElementById("chat-placeholder");
-    if (placeholderItem) {
-      sideMenuList.replaceChild(activeItem, placeholderItem);
-    } else {
+    //let placeholderItem = document.getElementById("chat-placeholder");
+    //if (placeholderItem) {
+    //  sideMenuList.replaceChild(activeItem, placeholderItem);
+    //} else {
       // If the placeholder doesn't exist for some reason, just prepend the actual item
       sideMenuList.prepend(activeItem);
-    }
+    //}
   }
 
   activeItem.classList.add('active');

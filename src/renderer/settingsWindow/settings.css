@@ -17,14 +17,14 @@ h1 {
     flex-direction: column;
 }
 
-.settings-inputs {
+/* .settings-inputs {
     display: flex;
     flex-direction: row;
     flex:1;
     align-items: baseline;
     justify-content: space-between;
     margin-bottom: 3em;
-}
+} */
 
 #openaiAPIKey {
     display: inline-block;

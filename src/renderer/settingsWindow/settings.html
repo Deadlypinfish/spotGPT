@@ -13,13 +13,24 @@
 
         <form id="settings-form">
             <div class="settings-panel">
-                <div class="settings-inputs">
+                <div class="form-group">
+
                     <label for="openaiAPIKey">OpenAI API Key:</label>
                     <input type="password" id="openaiAPIKey" name="openaiAPIKey" required>
+
                 </div>
 
+                <div class="form-group">
+                    <label for="modelEngineDropdown">Model Engine</label>
+                    <select id="modelEngineDropdown" name="modelEngineDropdown"></select>
+                </div>
                 
-                <button type="submit" id="btn-save-preferences">Save</button>
+
+                
+                <div class="bottom-buttons">
+                    <button type="button" id="cancelBtn">Cancel</button>
+                    <button type="submit" id="btn-save-preferences">Save</button>
+                </div>
             </div>
         </form>
     </div>
