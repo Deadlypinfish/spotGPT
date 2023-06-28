@@ -227,6 +227,16 @@ body {
     color:white;
 }
 
+.btn-chat-retry {
+    background: cadetblue;
+    color: white;
+}
+
+.btn-chat-retry:hover {
+    background: rgb(117, 190, 192);
+    color: white;
+}
+
 .btn-new-chat:hover {
     background: #535465;
 }

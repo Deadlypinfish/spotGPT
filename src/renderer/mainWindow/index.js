@@ -42,6 +42,21 @@ document
     }
   });
 
+function retryChat_Click() {
+  const chatId = document.getElementById('active-chat-id').value;
+
+  document.getElementById("user-input").value = '';
+  document.getElementById("user-input").disabled = true;
+
+  document.getElementById('response-info').style.display = 'none';
+  document.getElementById("chat-retry").style.display = 'none';
+  document.getElementById("chat-retry").style.display = 'none';
+
+  showLoading();
+
+  ipcRenderer.invoke("retry-query", chatId);
+}
+
 function editList_Click() {
   isEditListMode = !isEditListMode;
 
@@ -92,6 +107,7 @@ function newChat_Click() {
   clearActive();
 
   document.getElementById('chat-retry').style.display = 'none';
+  document.getElementById('response-info').style.display = 'none';
   document.getElementById('btn-submit-message').style.display = 'block';
 
   document.getElementById("user-input").focus();
@@ -141,6 +157,24 @@ ipcRenderer.on("api-response", (event, data) => {
   } else {
     document.querySelector("#chat-archived").style.display = 'none';
     document.querySelector(".chat-input").style.display = 'block';
+    
+    // if the most recent message is a user role, assume the api failed
+    // and show the retry, and hide submit and disable input
+    if (messages[messages.length - 1].role === 'user') {
+      document.getElementById('response-info').style.display = 'block';
+      document.getElementById('chat-retry').style.display = 'inline-block';
+      document.getElementById('btn-submit-message').style.display = 'none';
+      document.getElementById("user-input").value = '';
+      document.getElementById("user-input").disabled = true;
+    }
+    else {
+      document.getElementById('response-info').style.display = 'none';
+      document.getElementById('chat-retry').style.display = 'none';
+      document.getElementById('btn-submit-message').style.display = 'block';
+      document.getElementById('chat-retry-message').style.display = 'none';
+      document.getElementById("user-input").value = '';
+      document.getElementById("user-input").disabled = false;
+    }
   }
   
 
@@ -175,7 +209,8 @@ ipcRenderer.on("api-call-failed", (event, data) => {
   // document.getElementById("user-input").disabled = false;
   // document.getElementById("user-input").focus();
   
-  document.getElementById("chat-retry").style.display = 'block';
+  document.getElementById("chat-retry").style.display = 'inline-block';
+  document.getElementById('response-info').style.display = 'block';
 
 
 
@@ -215,7 +250,8 @@ ipcRenderer.on("db-operation-failed", (event, data) => {
   document.getElementById("user-input").disabled = false;
   document.getElementById("user-input").focus();
 
-  document.getElementById('chat-retry-message').style.display = 'block';
+  document.getElementById('response-info').style.display = 'block';
+  document.getElementById('chat-retry-message').style.display = 'inline-block';
   document.getElementById('chat-retry-message').innerHTML = 'There was a problem saving this message to the database...';
 
   // if the chat id doesn't exist
@@ -258,6 +294,7 @@ ipcRenderer.on('loading', (event, data) => {
   document.getElementById("user-input").disabled = true;
   document.getElementById("active-chat-id").value = chatId;
 
+  document.getElementById('response-info').style.display = 'none';
   document.getElementById("chat-retry").style.display = 'none';
 
   // show loading/don't allow input
@@ -295,6 +332,24 @@ ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}
   } else {
     document.querySelector(".chat-input").style.display = 'block';
     document.querySelector("#chat-archived").style.display = 'none';
+
+    // if the most recent message is a user role, assume the api failed
+    // and show the retry, and hide submit and disable input
+    if (messages[messages.length - 1].role === 'user') {
+      document.getElementById('response-info').style.display = 'block';
+      document.getElementById('chat-retry').style.display = 'inline-block';
+      document.getElementById('btn-submit-message').style.display = 'none';
+      document.getElementById("user-input").value = '';
+      document.getElementById("user-input").disabled = true;
+    }
+    else {
+      document.getElementById('response-info').style.display = 'none';
+      document.getElementById('chat-retry').style.display = 'none';
+      document.getElementById('btn-submit-message').style.display = 'block';
+      document.getElementById('chat-retry-message').style.display = 'none';
+      document.getElementById("user-input").value = '';
+      document.getElementById("user-input").disabled = false;
+    }
   }
 
   // if (isArchived) {
@@ -311,20 +366,7 @@ ipcRenderer.on('chat-messages', (event, {messages, isArchived, isCloseToArchive}
     document.querySelector('#chat-warning').style.display = 'none';
   }
 
-  // if the most recent message is a user role, assume the api failed
-  // and show the retry, and hide submit and disable input
-  if (messages[messages.length - 1].role === 'user') {
-    document.getElementById('chat-retry').style.display = 'block';
-    document.getElementById('btn-submit-message').style.display = 'none';
-    document.getElementById("user-input").value = '';
-    document.getElementById("user-input").disabled = true;
-  }
-  else {
-    document.getElementById('chat-retry').style.display = 'none';
-    document.getElementById('btn-submit-message').style.display = 'block';
-    document.getElementById("user-input").value = '';
-    document.getElementById("user-input").disabled = false;
-  }
+  
 })
 
 // General method for appending messages to chat container

@@ -381,8 +381,15 @@ app.on("will-quit", () => {
 });
 
 const callApi = async (messages, configuration) => {
+  console.log('callApi called');
+  let model = store.get('MODEL_ENGINE');
+  console.log(model)
+
+  if (!model) model = 'gpt-3.5-turbo';
+
+  model = 'gpt-3.5-turbo';
+
   const openai = new OpenAIApi(configuration);
-  const model = store.get('MODEL_ENGINE');
   const chatCompletion = await openai.createChatCompletion({
     model: model,
     messages: messages,
@@ -469,7 +476,7 @@ async function createChatAndMessage(chatName, userQuery) {
   });
 };
 
-async function saveGptMessageAndUpdateChat(chatId, chatName, chatCompletion) {
+async function saveGptMessageAndUpdateChat(chatId, chatCompletion) {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
@@ -505,7 +512,7 @@ async function saveGptMessageAndUpdateChat(chatId, chatName, chatCompletion) {
               createdAt: new Date()
             }
 
-            resolve([assistantMessage, chatName]);
+            resolve(assistantMessage);
           });
         });
       });
@@ -677,6 +684,7 @@ function toggleShortcut(registerShortcut) {
 
 ipcMain.handle('run-query', async (event, data) => {
   let previousMessages = [];
+  let messages = [];
   let tokenCount = 0;
 
   let newMessage;
@@ -728,7 +736,7 @@ ipcMain.handle('run-query', async (event, data) => {
     // messages to give AI full context of conversation
     // (map is to take db columns to conver to openaiAPI
     // object parameter names)
-    const messages = previousMessages.map(msg => ({
+    messages = previousMessages.map(msg => ({
       role: msg.role,
       content: msg.content
     }));
@@ -762,9 +770,9 @@ ipcMain.handle('run-query', async (event, data) => {
 
     let assistantResponse;
     // if (isNewChat) {
-      const result = await saveGptMessageAndUpdateChat(data.id, chatCompletion);
+      assistantResponse = await saveGptMessageAndUpdateChat(data.id, chatCompletion);
       //data.id = result[0];
-      assistantResponse = result[1];
+      //assistantResponse = result[1];
 
       //await saveGptMessageAndUpdateChat(data.id, chatCompletion);
     // } else {
@@ -773,8 +781,14 @@ ipcMain.handle('run-query', async (event, data) => {
     // }
 
     // Send the data to the renderer process
+    // mainWindow.webContents.send('api-response', {
+    //   messages: assistantResponse,
+    //   chatName: data.chatName,
+    //   isArchived: isArchived,
+    //   isCloseToArchive: isCloseToArchive
+    // });
     mainWindow.webContents.send('api-response', {
-      messages: assistantResponse,
+      messages: [assistantResponse],
       chatName: data.chatName,
       isArchived: isArchived,
       isCloseToArchive: isCloseToArchive
@@ -797,59 +811,39 @@ ipcMain.handle('run-query', async (event, data) => {
   }
 });
 
+ipcMain.handle('retry-query', async (event, chatId) => {
+  let previousMessages = [];
+  let tokenCount = 0;
 
-ipcMain.handle('run-query-old', async (event, data) => {
+  let isArchived = false;
+  let isCloseToArchive = false;
+
   try {
-    // Get the previous messages
-    let previousMessages = [];
-    let tokenCount = 0;
-    //let chatName = '';
-
-    if (data.id) {
-      previousMessages = await getChatMessages(data.id);
-      tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
-      //const result = await getChatMessages(data.id);
-      //previousMessages = result.messages;
-      //tokenCount = result.tokenCount;
+    previousMessages = await getChatMessages(chatId);
+    tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
+    
+    if (tokenCount > 3200) {
+      // Warn the user
+      isCloseToArchive = true;
     }
-    else {
-      data.chatName = extractKeywords(data.query);
-
-      // clear any potential messages in the main window since this is a new search
-      // mainWindow.webContents.send('chat-messages', {
-      //   messages: [],
-      //   isArchived:false,
-      //   isCloseToArchive: false
-      // });
-
-      mainWindow.webContents.send('loading', data.chatName);
-
+    else if (tokenCount > 3900) {
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      // Disable input for this chat and inform the user
+      isArchived = true;
     }
 
-    // Convert previous messages into the format expected by OpenAI API
+    // Prepare previous messages to give AI full context of conversation
     const messages = previousMessages.map(msg => ({
       role: msg.role,
       content: msg.content
     }));
-
-    // Add the new user message
-    messages.push({ role: "user", content: data.query });
 
     const configuration = new Configuration({
       apiKey: store.get('OPENAI_API_KEY')
     });
 
     const chatCompletion = await callApi(messages, configuration);
-    console.dir(chatCompletion);
-    console.log(chatCompletion.data.usage.total_tokens);
 
-    const result = await saveMessages(data, chatCompletion);
-    const savedMessages = result[0];
-    //const chatName = result[1];
-
-    let isArchived = false;
-    let isCloseToArchive = false;
-    //const tokenCount = estimateTokenCount(messages);
     if (chatCompletion.data.usage.total_tokens > 3200) {
       // Warn the user
       isCloseToArchive = true;
@@ -860,28 +854,114 @@ ipcMain.handle('run-query-old', async (event, data) => {
       isArchived = true;
     }
 
+    const assistantResponse = await saveGptMessageAndUpdateChat(chatId, chatCompletion);
+
     // Send the data to the renderer process
     mainWindow.webContents.send('api-response', {
-      messages: savedMessages,
-      chatName: data.chatName,
+      messages: [assistantResponse],
+      chatName: assistantResponse.chatName,  // Assuming assistantResponse object contains chatName
       isArchived: isArchived,
       isCloseToArchive: isCloseToArchive
     });
-    
+
     mainWindow.show();
     mainWindow.focus();
 
   } catch (error) {
-    // reset and show error
-    // if there is not a chat id yet, we can remove the placeholder?
-    // or maybe put it back in the input text to try again. or do we still create the chat
-    // and save the single message to let them try again. 
+    let response = {
+      isArchived: isArchived,
+      isCloseToArchive: isCloseToArchive
+    }
 
-    mainWindow.webContents.send('api-failed', data);
-
+    mainWindow.webContents.send('api-call-failed', response);
     console.error(error);
   }
 });
+
+// ipcMain.handle('run-query-old', async (event, data) => {
+//   try {
+//     // Get the previous messages
+//     let previousMessages = [];
+//     let tokenCount = 0;
+//     //let chatName = '';
+
+//     if (data.id) {
+//       previousMessages = await getChatMessages(data.id);
+//       tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
+//       //const result = await getChatMessages(data.id);
+//       //previousMessages = result.messages;
+//       //tokenCount = result.tokenCount;
+//     }
+//     else {
+//       data.chatName = extractKeywords(data.query);
+
+//       // clear any potential messages in the main window since this is a new search
+//       // mainWindow.webContents.send('chat-messages', {
+//       //   messages: [],
+//       //   isArchived:false,
+//       //   isCloseToArchive: false
+//       // });
+
+//       mainWindow.webContents.send('loading', data.chatName);
+
+//     }
+
+//     // Convert previous messages into the format expected by OpenAI API
+//     const messages = previousMessages.map(msg => ({
+//       role: msg.role,
+//       content: msg.content
+//     }));
+
+//     // Add the new user message
+//     messages.push({ role: "user", content: data.query });
+
+//     const configuration = new Configuration({
+//       apiKey: store.get('OPENAI_API_KEY')
+//     });
+
+//     const chatCompletion = await callApi(messages, configuration);
+//     console.dir(chatCompletion);
+//     console.log(chatCompletion.data.usage.total_tokens);
+
+//     const result = await saveMessages(data, chatCompletion);
+//     const savedMessages = result[0];
+//     //const chatName = result[1];
+
+//     let isArchived = false;
+//     let isCloseToArchive = false;
+//     //const tokenCount = estimateTokenCount(messages);
+//     if (chatCompletion.data.usage.total_tokens > 3200) {
+//       // Warn the user
+//       isCloseToArchive = true;
+//     }
+//     else if (chatCompletion.data.usage.total_tokens > 3900) {
+//       db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+//       // Disable input for this chat and inform the user
+//       isArchived = true;
+//     }
+
+//     // Send the data to the renderer process
+//     mainWindow.webContents.send('api-response', {
+//       messages: savedMessages,
+//       chatName: data.chatName,
+//       isArchived: isArchived,
+//       isCloseToArchive: isCloseToArchive
+//     });
+    
+//     mainWindow.show();
+//     mainWindow.focus();
+
+//   } catch (error) {
+//     // reset and show error
+//     // if there is not a chat id yet, we can remove the placeholder?
+//     // or maybe put it back in the input text to try again. or do we still create the chat
+//     // and save the single message to let them try again. 
+
+//     mainWindow.webContents.send('api-failed', data);
+
+//     console.error(error);
+//   }
+// });
 
 ipcMain.on("hide-window", () => {
   if (spotWindow) {
