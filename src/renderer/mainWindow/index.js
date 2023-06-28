@@ -198,6 +198,7 @@ ipcRenderer.on("api-call-failed", (event, data) => {
 
 });
 
+// {query: 'try this out', id: '', chatName: 'Try'}
 ipcRenderer.on("db-operation-failed", (event, data) => {
   console.log("db-operation-failed");
   console.log(data);
@@ -208,37 +209,20 @@ ipcRenderer.on("db-operation-failed", (event, data) => {
   submitButton.style.display = 'block';
   spinner.style.display = 'none';
 
-  // todo make this data query
-  document.getElementById("user-input").value = '';
+  // put input back into chat-input to let the user keep it but
+  // be aware it didn't save
+  document.getElementById("user-input").value = data.query;
   document.getElementById("user-input").disabled = false;
   document.getElementById("user-input").focus();
 
+  document.getElementById('chat-retry-message').style.display = 'block';
+  document.getElementById('chat-retry-message').innerHTML = 'There was a problem saving this message to the database...';
+
   // if the chat id doesn't exist
-  document.getElementById("active-chat-id").value = data.messages[0].chatId;
-  
-  appendMessagesToChatContainer(data.messages);
+  if (data.id) {
+    document.getElementById("active-chat-id").value = data.messages[0].chatId;
+    setActiveChat(data.messages[0].chatId, data.chatName);
 
-  setActiveChat(data.messages[0].chatId, data.chatName);
-  //document.getElementById("chat-response").innerText = data.message.content;
-
-  if (data.isArchived) {
-    document.querySelector(".chat-input").style.display = 'none';
-    document.querySelector("#chat-archived").style.display = 'block';
-    // document.getElementById("user-input").disabled = true;
-    // document.getElementById("btn-submit-message").disabled = true;
-    // document.getElementById("btn-submit-message").style.display = 'none';
-  } else {
-    document.querySelector("#chat-archived").style.display = 'none';
-    document.querySelector(".chat-input").style.display = 'block';
-  }
-  
-
-  if (data.isCloseToArchive) {
-    document.querySelector('#chat-warning').style.display = 'block';
-    console.warn("The chat is close to the archive limit.");
-  }
-  else {
-    document.querySelector('#chat-warning').style.display = 'none';
   }
 
 });
@@ -267,17 +251,19 @@ ipcRenderer.on('loading', (event, data) => {
 
   appendMessagesToChatContainer(data.messages);
 
+  const chatId = data.messages.length ? data.messages[0].chatId : null;
+
   // clear input
   document.getElementById("user-input").value = '';
   document.getElementById("user-input").disabled = true;
-  document.getElementById("active-chat-id").value = '';
+  document.getElementById("active-chat-id").value = chatId;
 
   document.getElementById("chat-retry").style.display = 'none';
 
   // show loading/don't allow input
   showLoading();
 
-  setActiveChat(data.id, data.chatName);
+  setActiveChat(chatId, data.chatName);
   
 })
 

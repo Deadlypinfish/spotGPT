@@ -400,6 +400,30 @@ const callApi = async (messages, configuration) => {
 //   return chatCompletion;
 // };
 
+
+async function insertMessage({chatId: chatId, role: role, content: userQuery}) {
+  return new Promise((resolve, reject) => {
+    db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, 
+           [chatId, role, userQuery], function (err) {
+      if (err) {
+        console.error(err.message);
+        reject(err);
+        return;
+      }
+
+      const userMessage = {
+        chatId: chatId,
+        role: role,
+        content: userQuery,
+        createdAt: new Date()
+      }
+
+      resolve(userMessage);
+    });
+  });
+};
+
+
 async function createChatAndMessage(chatName, userQuery) {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
@@ -490,91 +514,91 @@ async function saveGptMessageAndUpdateChat(chatId, chatName, chatCompletion) {
 };
 
 
-const saveMessages = async ({id: chatId, query: userQuery, chatName: chatName}, chatCompletion) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run("BEGIN TRANSACTION");
-      //let chatName = '';
+// const saveMessages = async ({id: chatId, query: userQuery, chatName: chatName}, chatCompletion) => {
+//   return new Promise((resolve, reject) => {
+//     db.serialize(() => {
+//       db.run("BEGIN TRANSACTION");
+//       //let chatName = '';
 
-      if (!chatId) {
-        //chatName = extractKeywords(userQuery);
+//       if (!chatId) {
+//         //chatName = extractKeywords(userQuery);
 
-        db.run(`INSERT INTO chats(chat_name, total_tokens) VALUES(?, ?)`, [chatName, chatCompletion.data.usage.total_tokens], function (err) {
-          if (err) {
-            console.error(err.message);
-            db.run('ROLLBACK');
-            reject(err);
-            return;
-          }
-          chatId = this.lastID;
+//         db.run(`INSERT INTO chats(chat_name, total_tokens) VALUES(?, ?)`, [chatName, chatCompletion.data.usage.total_tokens], function (err) {
+//           if (err) {
+//             console.error(err.message);
+//             db.run('ROLLBACK');
+//             reject(err);
+//             return;
+//           }
+//           chatId = this.lastID;
 
-          insertUserMessage();
-        });
-      } else {
-        //updateTokenTotal(chatCompletion.data.choices[0].message.content);
-        //insertUserMessage();
-        db.run(`UPDATE chats SET total_tokens = ? WHERE id = ?`, [chatCompletion.data.usage.total_tokens, chatId], function (err) {
-          if (err) {
-            console.error(err.message);
-            db.run('ROLLBACK');
-            reject(err);
-            return;
-          }
-          insertUserMessage();
-        })
-      }
+//           insertUserMessage();
+//         });
+//       } else {
+//         //updateTokenTotal(chatCompletion.data.choices[0].message.content);
+//         //insertUserMessage();
+//         db.run(`UPDATE chats SET total_tokens = ? WHERE id = ?`, [chatCompletion.data.usage.total_tokens, chatId], function (err) {
+//           if (err) {
+//             console.error(err.message);
+//             db.run('ROLLBACK');
+//             reject(err);
+//             return;
+//           }
+//           insertUserMessage();
+//         })
+//       }
 
-      function insertUserMessage() {
-        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'user', userQuery], function (err) {
-          if (err) {
-            console.error(err.message);
-            db.run('ROLLBACK');
-            reject(err);
-            return;
-          }
+//       function insertUserMessage() {
+//         db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'user', userQuery], function (err) {
+//           if (err) {
+//             console.error(err.message);
+//             db.run('ROLLBACK');
+//             reject(err);
+//             return;
+//           }
 
-          insertAssistantMessage();
-        });
-      }
+//           insertAssistantMessage();
+//         });
+//       }
 
-      function insertAssistantMessage() {
-        db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'assistant', chatCompletion.data.choices[0].message.content], function (err) {
-          if (err) {
-            console.error(err.message);
-            db.run('ROLLBACK');
-            reject(err);
-            return;
-          }
+//       function insertAssistantMessage() {
+//         db.run(`INSERT INTO messages(chatId, role, content) VALUES(?, ?, ?)`, [chatId, 'assistant', chatCompletion.data.choices[0].message.content], function (err) {
+//           if (err) {
+//             console.error(err.message);
+//             db.run('ROLLBACK');
+//             reject(err);
+//             return;
+//           }
 
-          db.run('COMMIT', function (err) {
-            if (err) {
-              console.error(err.message);
-              db.run('ROLLBACK');
-              reject(err);
-              return;
-            }
+//           db.run('COMMIT', function (err) {
+//             if (err) {
+//               console.error(err.message);
+//               db.run('ROLLBACK');
+//               reject(err);
+//               return;
+//             }
 
-            const userMessage = {
-              chatId: chatId,
-              role: 'user',
-              content: userQuery,
-              createdAt: new Date()
-            }
+//             const userMessage = {
+//               chatId: chatId,
+//               role: 'user',
+//               content: userQuery,
+//               createdAt: new Date()
+//             }
 
-            const assistantMessage = {
-              chatId: chatId,
-              role: 'assistant',
-              content: chatCompletion.data.choices[0].message.content,
-              createdAt: new Date()
-            }
+//             const assistantMessage = {
+//               chatId: chatId,
+//               role: 'assistant',
+//               content: chatCompletion.data.choices[0].message.content,
+//               createdAt: new Date()
+//             }
 
-            resolve([[userMessage, assistantMessage],chatName]);
-          });
-        });
-      }
-    });
-  });
-};
+//             resolve([[userMessage, assistantMessage],chatName]);
+//           });
+//         });
+//       }
+//     });
+//   });
+// };
 
 ipcMain.on('delete-chats', (event, chatIds) => {
   console.log('delete chats called');
@@ -665,8 +689,17 @@ ipcMain.handle('run-query', async (event, data) => {
     if (data.id) {
       previousMessages = await getChatMessages(data.id);
       tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
+      newMessage = {
+        chatId: data.id,
+        role: 'user',
+        content: data.query,
+        createdAt: new Date()
+      }
+      await insertMessage(newMessage);
+
     } else {
       data.chatName = extractKeywords(data.query);
+      //throw new Error('db error!');
       const result = await createChatAndMessage(data.chatName, data.query);
       data.id = result[0];
       newMessage = result[1];
@@ -677,7 +710,7 @@ ipcMain.handle('run-query', async (event, data) => {
       isCloseToArchive = true;
     }
     else if (tokenCount > 3900) {
-      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, newMessage.chatId);
       // Disable input for this chat and inform the user
       isArchived = true;
     }
@@ -722,22 +755,22 @@ ipcMain.handle('run-query', async (event, data) => {
       isCloseToArchive = true;
     }
     else if (chatCompletion.data.usage.total_tokens > 3900) {
-      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, newMessage.chatId);
       // Disable input for this chat and inform the user
       isArchived = true;
     }
 
     let assistantResponse;
-    if (isNewChat) {
+    // if (isNewChat) {
       const result = await saveGptMessageAndUpdateChat(data.id, chatCompletion);
       //data.id = result[0];
       assistantResponse = result[1];
 
       //await saveGptMessageAndUpdateChat(data.id, chatCompletion);
-    } else {
-      const result = await saveMessages(data, chatCompletion);
-      assistantResponse = result[0][0];
-    }
+    // } else {
+    //   const result = await saveMessages(data, chatCompletion);
+    //   assistantResponse = result[0][0];
+    // }
 
     // Send the data to the renderer process
     mainWindow.webContents.send('api-response', {
@@ -752,23 +785,7 @@ ipcMain.handle('run-query', async (event, data) => {
     mainWindow.focus();
 
   } catch (error) {
-    // Send error to renderer process
-    // let userMessage = {
-    //   chatId: data.id,
-    //   role: 'user',
-    //   content: data.query,
-    //   createdAt: new Date()
-    // }
 
-    // let newMessage = 
-    // {
-    //   messages: [savedMessages],
-    //   chatName: data.chatName,
-    //   isArchived: isArchived,
-    //   isCloseToArchive: isCloseToArchive
-    // }
-
-    {}
 
     let response = {
       isArchived: isArchived,
