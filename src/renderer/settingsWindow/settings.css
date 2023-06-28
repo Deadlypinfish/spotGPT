@@ -26,13 +26,28 @@ h1 {
     margin-bottom: 3em;
 } */
 
+.form-group {
+    margin-bottom: 1em;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+
+.bottom-buttons {
+    display: flex;
+    gap: 1em;
+    justify-content: center;
+    margin-top: 2em;
+}
+
 #openaiAPIKey {
     display: inline-block;
     /* width: calc(100% - 6em); */
     /* height: 100%; */
     /* font-size: 1.2em; */
     border-radius: 5px;
-    width: 50%;
+    flex:1;
     background: #40414f;
     border: none;
     outline: none;
@@ -45,8 +60,31 @@ h1 {
     /* padding-right: 5em; */
 }
 
+#modelEngineDropdown {
+    display: inline-block;
+    border-radius: 5px;
+    flex:1;
+    background: #40414f;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    color: white;
+    font-family: arial;
+    padding: 1em;
+}
+
 #btn-save-preferences {
     background-color: cadetblue;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    font-family: arial;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+#cancelBtn {
+    background-color: rgb(58, 58, 58);
     color: white;
     border: none;
     padding: 5px 15px;
