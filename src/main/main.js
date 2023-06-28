@@ -655,6 +655,10 @@ ipcMain.handle('run-query', async (event, data) => {
   let previousMessages = [];
   let tokenCount = 0;
 
+  let newMessage;
+  let isArchived = false;
+  let isCloseToArchive = false;
+  
   try {
     const isNewChat = !data.id;
 
@@ -663,12 +667,34 @@ ipcMain.handle('run-query', async (event, data) => {
       tokenCount = previousMessages.length ? previousMessages[0].total_tokens : 0;
     } else {
       data.chatName = extractKeywords(data.query);
-      data.id = await createChatAndMessage(data);
-
-      mainWindow.webContents.send('loading', data);
+      const result = await createChatAndMessage(data.chatName, data.query);
+      data.id = result[0];
+      newMessage = result[1];
     }
 
+    if (tokenCount > 3200) {
+      // Warn the user
+      isCloseToArchive = true;
+    }
+    else if (tokenCount > 3900) {
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      // Disable input for this chat and inform the user
+      isArchived = true;
+    }
 
+    const loadingData = {
+      messages: [newMessage],
+      chatName: data.chatName,
+      isArchived: isArchived,
+      isCloseToArchive: isCloseToArchive
+    }
+    mainWindow.webContents.send('loading', loadingData);
+
+
+    // prepare new message to be appended to old
+    // messages to give AI full context of conversation
+    // (map is to take db columns to conver to openaiAPI
+    // object parameter names)
     const messages = previousMessages.map(msg => ({
       role: msg.role,
       content: msg.content
@@ -690,21 +716,66 @@ ipcMain.handle('run-query', async (event, data) => {
 
     const chatCompletion = await callApi(messages, configuration);
 
-    if (isNewChat) {
-      await saveGptMessageAndUpdateChat(data.id, chatCompletion);
-    } else {
-      const result = await saveMessages(data, chatCompletion);
+    //const tokenCount = estimateTokenCount(messages);
+    if (chatCompletion.data.usage.total_tokens > 3200) {
+      // Warn the user
+      isCloseToArchive = true;
+    }
+    else if (chatCompletion.data.usage.total_tokens > 3900) {
+      db.run(`UPDATE chats SET isArchived = 1 WHERE id = ?`, chatId);
+      // Disable input for this chat and inform the user
+      isArchived = true;
     }
 
-    // other logic...
-    // TODO archive/warning
+    let assistantResponse;
+    if (isNewChat) {
+      const result = await saveGptMessageAndUpdateChat(data.id, chatCompletion);
+      //data.id = result[0];
+      assistantResponse = result[1];
+
+      //await saveGptMessageAndUpdateChat(data.id, chatCompletion);
+    } else {
+      const result = await saveMessages(data, chatCompletion);
+      assistantResponse = result[0][0];
+    }
+
+    // Send the data to the renderer process
+    mainWindow.webContents.send('api-response', {
+      messages: assistantResponse,
+      chatName: data.chatName,
+      isArchived: isArchived,
+      isCloseToArchive: isCloseToArchive
+    });
+    
 
     mainWindow.show();
     mainWindow.focus();
 
   } catch (error) {
     // Send error to renderer process
-    mainWindow.webContents.send('api-call-failed', data);
+    // let userMessage = {
+    //   chatId: data.id,
+    //   role: 'user',
+    //   content: data.query,
+    //   createdAt: new Date()
+    // }
+
+    // let newMessage = 
+    // {
+    //   messages: [savedMessages],
+    //   chatName: data.chatName,
+    //   isArchived: isArchived,
+    //   isCloseToArchive: isCloseToArchive
+    // }
+
+    {}
+
+    let response = {
+      isArchived: isArchived,
+      isCloseToArchive: isCloseToArchive
+    }
+
+    mainWindow.webContents.send('api-call-failed', response);
     console.error(error);
   }
 });
