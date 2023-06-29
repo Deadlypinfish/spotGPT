@@ -181,32 +181,91 @@ ipcMain.handle('get-model-engines-api', async (event) => {
   return data;
 });
 
-function initDatabase() {
+//await run(db, "INSERT INTO MyTable (col1, col2) VALUES (?, ?)", ['value1', 'value2']);
+function sqliteRun(db, query, params = []) {
   return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+    db.run(query, params, (err) => {
+      if (err) reject(err);
+      resolve();
+    })
+  })
+}
+
+//const row = await get(db, "SELECT * FROM MyTable WHERE id = ?", [1]);
+function sqliteGet(db, query, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(query, params, (err, row) => {
+      if (err) reject(err);
+      resolve(row);
+    })
+  })
+}
+
+// const rows = await all(db, "SELECT * FROM MyTable WHERE column = ?", ['value']);
+function sqliteAll(db, query, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(query, params, (err, rows) => {
+      if (err) reject(err);
+      resolve(rows);
+    })
+  })
+}
+
+async function sqliteColumnExists(db, tableName, columnName) {
+  const rows = await sqliteAll(db, `PRAGMA table_info(${tableName})`);
+  for (const row of rows) {
+    if (row.name === columnName) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function initDatabase() {
+
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, async (err) => {
       if (err) reject(err);
 
-      db.serialize(() => {
-        db.run(`CREATE TABLE IF NOT EXISTS chats (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          chat_name TEXT NOT NULL,
-          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-          isArchived BOOLEAN DEFAULT 0,
-          total_tokens INTEGER DEFAULT 0
-        )`);
 
-        db.run(`CREATE TABLE IF NOT EXISTS messages (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          chatId INTEGER NOT NULL,
-          role TEXT NOT NULL,
-          content TEXT NOT NULL,
-          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY(chatId) REFERENCES chats(id)
-        )`, (err) => {
-          if (err) reject(err);
-          resolve(db);
-        });
-      });
+      try {
+        const row = await sqliteGet(db, 'PRAGMA user_version');
+        const dbVersion = row.user_version;
+
+        if (dbVersion < 1) {
+          await sqliteRun(db, `CREATE TABLE IF NOT EXISTS chats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_name TEXT NOT NULL,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            isArchived BOOLEAN DEFAULT 0
+          )
+          `);
+
+          await sqliteRun(db, `CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chatId INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(chatId) REFERENCES chats(id)
+          )`);
+          
+          await sqliteRun(db, "PRAGMA user_version = 1");
+        }
+
+        if(dbVersion < 2) {
+          if (!(await sqliteColumnExists(db, 'chats', 'total_tokens'))) {
+            await sqliteRun(db, `ALTER TABLE chats ADD COLUMN total_tokens INTEGER DEFAULT 0`);
+          }
+          await sqliteRun(db, "PRAGMA user_version = 2");
+        }
+
+        resolve(db);
+
+      } catch(err) {
+        reject(err);
+      }
+
     });
   });
 }
