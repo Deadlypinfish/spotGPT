@@ -283,11 +283,16 @@ ipcRenderer.on('loading', (event, data) => {
   
   // clear container
   const chatMessagesContainer = document.querySelector('.chat-messages');
-  //chatMessagesContainer.innerHTML = '';
+  
+  // if the incoming chat has a different id than the existing chat, clear the messages it's probably
+  // a new chat
+  const chatId = data.messages.length ? data.messages[0].chatId : null;
+  const existingID = document.getElementById('active-chat-id').value;
+  if (existingID != chatId)
+    chatMessagesContainer.innerHTML = '';
 
   appendMessagesToChatContainer(data.messages);
 
-  const chatId = data.messages.length ? data.messages[0].chatId : null;
 
   // clear input
   document.getElementById("user-input").value = '';
