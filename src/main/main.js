@@ -79,7 +79,7 @@ const createMainWindow = async () => {
     await mainWindow.loadFile(mainWindowPath);
     //await mainWindow.loadFile("src/renderer/mainWindow/index.html");    
     
-    mainWindow.webContents.openDevTools();
+    //mainWindow.webContents.openDevTools();
   
 };
 
@@ -134,14 +134,49 @@ ipcMain.handle('get-model-engines-api', async (event) => {
   let data = [];
   
 
-try {
-  const response = await openai.listModels();
-  data = response.data;
-} catch (err) {
-console.error(err);
+  try {
+    const response = await openai.listModels();
+    //data = response.data.data;
+    data = response.data;
+  } catch (err) {
+    console.error(err);
 
-}
-  
+  }
+
+  // let accessibleModels = [];
+  // data = data.data;
+  // const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  // for (let model of data) {
+  //   console.log('trying model (' + model.id + ')');
+
+  //   try {
+  //     let messages = [
+  //       {"role": "user", "content": "test"}
+  //   ]
+  //     let chatConfig = {
+  //       model: model.id,
+  //       messages: messages,
+  //       max_tokens: 1
+  //     }
+  //     let res = await openai.createChatCompletion(
+  //       chatConfig
+  //     );
+
+  //     console.log('response');
+  //     console.log(res);
+
+  //     accessibleModels.push(model.id);
+  //   } catch(error) {
+  //     console.log('error');
+  //     console.error(error);
+  //   }
+
+  //   await sleep(1000);
+  // }
+
+  // fs.writeFileSync('accessible_models.txt', accessibleModels.join('\n'), 'utf8');
+  // console.log(accessibleModels);
   console.log(data);
   return data;
 });
@@ -288,7 +323,7 @@ app.whenReady().then(() => {
 
             settingsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'settingsWindow', 'settings.html')) // Path to your settings form
 
-            settingsWindow.webContents.openDevTools();
+            //settingsWindow.webContents.openDevTools();
           }
         }
       ]
@@ -385,9 +420,9 @@ const callApi = async (messages, configuration) => {
   let model = store.get('MODEL_ENGINE');
   console.log(model)
 
-  if (!model) model = 'gpt-3.5-turbo';
+  //if (!model) model = 'gpt-3.5-turbo';
 
-  model = 'gpt-3.5-turbo';
+  //model = 'gpt-3.5-turbo';
 
   const openai = new OpenAIApi(configuration);
   const chatCompletion = await openai.createChatCompletion({
